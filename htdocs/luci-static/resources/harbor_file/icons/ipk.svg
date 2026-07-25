@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <path fill="#dce8f3" d="M11 5h19l8 8v27a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"/>
+  <path fill="#ffffff" d="M12 9h16v9h8v21H12z"/>
+  <path fill="#86b8e8" d="M30 5v9h8z"/>
+  <path fill="#cadbe8" d="M30 14h8l-8 2z"/>
+  <rect x="11" y="22" width="26" height="13" rx="3" fill="#2f74d0"/>
+  <rect x="13" y="24" width="22" height="9" rx="1.5" fill="#3b86e8"/>
+  <text x="24" y="31.1" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="8.2" font-weight="700" text-anchor="middle">IPK</text>
+  <path fill="#dce8f3" d="M16 38h16v2H16z"/>
+</svg>

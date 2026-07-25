@@ -1,0 +1,589 @@
+msgid "Harbor File"
+msgstr "Harbor文件管理"
+
+msgid "File management"
+msgstr "文件管理"
+
+msgid "Quick access"
+msgstr "快捷访问"
+
+msgid "Documents"
+msgstr "文档"
+
+msgid "Pictures"
+msgstr "图片"
+
+msgid "Videos"
+msgstr "视频"
+
+msgid "Music"
+msgstr "音乐"
+
+msgid "Downloads"
+msgstr "下载"
+
+msgid "This device"
+msgstr "此设备"
+
+msgid "Frequent folders"
+msgstr "常用文件夹"
+
+msgid "Folders"
+msgstr "文件夹"
+
+msgid "Storage space"
+msgstr "存储空间"
+
+msgid "Back"
+msgstr "后退"
+
+msgid "Forward"
+msgstr "前进"
+
+msgid "Up"
+msgstr "上一级"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Name"
+msgstr "名称"
+
+msgid "Path"
+msgstr "路径"
+
+msgid "Type"
+msgstr "类型"
+
+msgid "Size"
+msgstr "大小"
+
+msgid "Modified"
+msgstr "修改时间"
+
+msgid "Folder"
+msgstr "文件夹"
+
+msgid "File"
+msgstr "文件"
+
+msgid "System Disk"
+msgstr "系统磁盘"
+
+msgid "Temporary Space"
+msgstr "临时空间"
+
+msgid "This folder is empty"
+msgstr "此文件夹为空"
+
+msgid "Path is not available"
+msgstr "路径不可用"
+
+msgid "Request failed"
+msgstr "请求失败"
+
+msgid "Open"
+msgstr "打开"
+
+msgid "Properties"
+msgstr "属性"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "Text preview"
+msgstr "文本预览"
+
+msgid "Image preview"
+msgstr "图片预览"
+
+msgid "Unable to load this image"
+msgstr "无法加载此图片"
+
+msgid "Video player"
+msgstr "视频播放器"
+
+msgid "This video format or codec is not supported by the browser"
+msgstr "浏览器不支持此视频格式或编码"
+
+msgid "This file type cannot be opened"
+msgstr "无法打开此文件类型"
+
+msgid "The file is too large. Only the first part is shown"
+msgstr "文件过大，仅显示前面部分"
+
+msgid "bytes"
+msgstr "字节"
+
+msgid "Upload files"
+msgstr "上传文件"
+
+msgid "Replace existing files"
+msgstr "替换现有文件"
+
+msgid "The following files already exist. Replace them with the uploaded files?"
+msgstr "以下文件已经存在，是否使用上传的文件替换？"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Replace"
+msgstr "替换"
+
+msgid "Upload to"
+msgstr "上传到"
+
+msgid "Uploading"
+msgstr "正在上传"
+
+msgid "Upload complete"
+msgstr "上传完成"
+
+msgid "Upload failed"
+msgstr "上传失败"
+
+msgid "An upload is already in progress"
+msgstr "已有上传任务正在进行"
+
+msgid "No files were selected"
+msgstr "未选择文件"
+
+msgid "Folder upload is not supported"
+msgstr "暂不支持上传文件夹"
+
+msgid "Not enough free space"
+msgstr "可用空间不足"
+
+msgid "Available space is less than 50MB, operation is not allowed"
+msgstr "可用空间不足50MB，无法操作"
+
+msgid "A directory or special file already uses this name"
+msgstr "同名目录或特殊文件已存在"
+
+msgid "Drop files on a writable directory"
+msgstr "请将文件拖放到可写目录"
+
+msgid "of"
+msgstr "共"
+
+msgid "New folder"
+msgstr "新建文件夹"
+
+msgid "Folder name"
+msgstr "文件夹名称"
+
+msgid "Rename"
+msgstr "重命名"
+
+msgid "New name"
+msgstr "新名称"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Confirm delete"
+msgstr "确认删除"
+
+msgid "Are you sure you want to permanently delete this item?"
+msgstr "确定要永久删除此项目吗？"
+
+msgid "Create"
+msgstr "创建"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Enter a valid name"
+msgstr "请输入有效名称"
+
+msgid "Folder created"
+msgstr "文件夹创建成功"
+
+msgid "Rename complete"
+msgstr "重命名成功"
+
+msgid "Delete complete"
+msgstr "删除成功"
+
+msgid "Operation failed"
+msgstr "操作失败"
+
+msgid "Uploaded"
+msgstr "已上传"
+
+msgid "Buffered"
+msgstr "已缓存"
+
+msgid "Buffering"
+msgstr "正在缓存"
+
+msgid "Video diagnostics"
+msgstr "视频加载诊断"
+
+msgid "Refresh log"
+msgstr "刷新日志"
+
+msgid "No diagnostic log"
+msgstr "暂无诊断日志"
+
+msgid "View"
+msgstr "查看"
+
+msgid "Large icons"
+msgstr "大图标"
+
+msgid "Medium icons"
+msgstr "中图标"
+
+msgid "Small icons"
+msgstr "小图标"
+
+msgid "List"
+msgstr "列表"
+
+msgid "Details"
+msgstr "详细信息"
+
+msgid "Tiles"
+msgstr "平铺"
+
+msgid "Copy to"
+msgstr "复制到"
+
+msgid "Move to"
+msgstr "移动到"
+
+msgid "Select destination folder"
+msgstr "选择目标文件夹"
+
+msgid "Confirm"
+msgstr "确认"
+
+msgid "Copy complete"
+msgstr "复制完成"
+
+msgid "Move complete"
+msgstr "移动完成"
+
+msgid "Multiple items"
+msgstr "多个项目"
+
+msgid "Selected %d items"
+msgstr "已选择 %d 项"
+
+msgid "Delete selected items?"
+msgstr "确定要永久删除选中的项目吗？"
+
+msgid "Batch operation stopped at: %s"
+msgstr "批量操作停止于：%s"
+
+msgid "Some items cannot be modified"
+msgstr "部分项目无法操作"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Default view"
+msgstr "默认显示方式"
+
+msgid "Home directory"
+msgstr "主目录"
+
+msgid "Common folders are created under this directory and shown in Quick access."
+msgstr "常用目录会创建在该目录下，并显示在快捷访问中。"
+
+msgid "System folder operations"
+msgstr "系统目录操作"
+
+msgid "Show hidden files"
+msgstr "显示隐藏文件"
+
+msgid "Thumbnails"
+msgstr "缩略图"
+
+msgid "Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders."
+msgstr "在图标和平铺视图中显示已缓存的图片缩略图。缩略图只支持图片文件夹，开启后可以在图片文件夹生成缩略图。"
+
+msgid "Generate thumbnails"
+msgstr "生成缩略图"
+
+msgid "Generating thumbnails"
+msgstr "正在生成缩略图"
+
+msgid "Thumbnail generation complete"
+msgstr "缩略图生成完成"
+
+msgid "Thumbnail generation failed"
+msgstr "缩略图生成失败"
+
+msgid "Another thumbnail generation task is already running"
+msgstr "已有缩略图生成任务正在进行"
+
+msgid "GraphicsMagick command not found"
+msgstr "未找到 GraphicsMagick 命令"
+
+msgid "GraphicsMagick is required to generate thumbnails"
+msgstr "生成缩略图需要安装 GraphicsMagick"
+
+msgid "Install GraphicsMagick"
+msgstr "安装 GraphicsMagick"
+
+msgid "GraphicsMagick is already installed"
+msgstr "GraphicsMagick 已经安装"
+
+msgid "Thumbnail task not found"
+msgstr "缩略图任务不存在"
+
+msgid "Preparing thumbnails"
+msgstr "正在准备缩略图"
+
+msgid "Current file"
+msgstr "当前文件"
+
+msgid "Progress"
+msgstr "进度"
+
+msgid "Generated"
+msgstr "已生成"
+
+msgid "Cached"
+msgstr "已缓存"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "Thumbnail generation ended unexpectedly"
+msgstr "缩略图生成任务异常结束"
+
+msgid "Thumbnail cache directory is not writable"
+msgstr "缩略图缓存目录不可写"
+
+msgid "No image files found"
+msgstr "未找到图片文件"
+
+msgid "Show Linux hidden files and folders whose names start with a dot."
+msgstr "显示 Linux 中名称以点开头的隐藏文件和文件夹。"
+
+msgid "Enter a valid absolute path"
+msgstr "请输入有效的绝对路径"
+
+msgid "Disabled"
+msgstr "禁用"
+
+msgid "Enabled"
+msgstr "启用"
+
+msgid "Settings saved"
+msgstr "设置已保存"
+
+msgid "System folder operations are disabled"
+msgstr "系统目录操作已禁用"
+msgid "Download file"
+msgstr "下载文件"
+
+msgid "Download failed"
+msgstr "下载失败"
+msgid "Copy"
+msgstr "复制"
+
+msgid "Cut"
+msgstr "剪切"
+
+msgid "Paste"
+msgstr "粘贴"
+
+msgid "Copied to clipboard"
+msgstr "已复制到剪贴板"
+
+msgid "Cut to clipboard"
+msgstr "已剪切到剪贴板"
+
+msgid "Clipboard is empty"
+msgstr "剪贴板为空"
+
+msgid "Paste complete"
+msgstr "粘贴完成"
+
+msgid "Installer"
+msgstr "安装器"
+
+msgid "Install"
+msgstr "安装"
+
+msgid "Install package"
+msgstr "安装软件包"
+
+msgid "Install this package now?"
+msgstr "现在安装这个软件包吗？"
+
+msgid "Installing package"
+msgstr "正在安装软件包"
+
+msgid "Package installed successfully"
+msgstr "软件包安装成功"
+
+msgid "Package installed with warnings"
+msgstr "软件包安装成功，但有告警"
+
+msgid "Package installation failed"
+msgstr "软件包安装失败"
+
+msgid "Another package installation is already running"
+msgstr "已有软件包安装任务正在运行"
+
+msgid "Installer command not found"
+msgstr "未找到安装命令"
+
+msgid "No log yet"
+msgstr "暂无日志"
+
+msgid "IPK Package"
+msgstr "IPK安装包"
+
+msgid "APK Package"
+msgstr "APK安装包"
+
+msgid "System package"
+msgstr "系统软件包"
+
+msgid "Package install task not found"
+msgstr "未找到软件包安装任务"
+
+msgid "Preparing package install"
+msgstr "正在准备安装软件包"
+
+msgid "Checking package index"
+msgstr "正在检查软件源索引"
+
+msgid "Updating package index"
+msgstr "正在更新软件源索引"
+
+msgid "Package index update failed"
+msgstr "软件源索引更新失败"
+
+msgid "Install task ended unexpectedly"
+msgstr "安装任务异常结束"
+
+msgid "Exit code"
+msgstr "退出码"
+
+msgid "Invalid package file"
+msgstr "无效的软件包文件"
+
+msgid "Invalid task id"
+msgstr "无效的任务编号"
+msgid "Terminal"
+msgstr "终端"
+
+msgid "Connecting to terminal"
+msgstr "正在连接终端"
+
+msgid "Terminal connection failed"
+msgstr "终端连接失败"
+
+msgid "Connection failed, please check whether the ttyd service is installed"
+msgstr "连接失败，请检查 ttyd 服务是否已经安装"
+
+msgid "Current path"
+msgstr "当前路径"
+
+msgid "Service address"
+msgstr "服务地址"
+
+msgid "The ttyd service is not installed or not configured"
+msgstr "ttyd 服务未安装或未配置"
+msgid "New file"
+msgstr "新建文件"
+
+msgid "File name"
+msgstr "文件名称"
+
+msgid "File created"
+msgstr "文件已创建"
+msgid "Move this item to the selected folder?"
+msgstr "确认将此项目移动到选中的文件夹吗？"
+
+msgid "Move selected items to the selected folder?"
+msgstr "确认将选中的项目移动到选中的文件夹吗？"
+
+msgid "Copy selected items to the selected folder?"
+msgstr "确认将选中的项目复制到选中的文件夹吗？"
+
+msgid "Source and destination folders cannot be the same"
+msgstr "源目录和目标目录不能相同"
+msgid "Choose how files and folders are shown when Harbor File opens."
+msgstr "设置 Harbor File 打开时默认的文件与文件夹显示方式。"
+
+msgid "Allow create, rename, move, upload and delete actions in protected system folders."
+msgstr "允许在受保护的系统目录中执行新建、重命名、移动、上传和删除操作。"
+msgid "Edit text"
+msgstr "编辑文本"
+
+msgid "Open binary"
+msgstr "二进制打开"
+
+msgid "Binary viewer"
+msgstr "二进制查看器"
+
+msgid "Offset"
+msgstr "偏移"
+
+msgid "Hex"
+msgstr "十六进制"
+
+msgid "ASCII"
+msgstr "ASCII"
+
+msgid "Read"
+msgstr "已读取"
+
+msgid "Start position"
+msgstr "起始位置"
+
+msgid "Read size"
+msgstr "读取大小"
+
+msgid "Load"
+msgstr "加载"
+
+msgid "Confirm range"
+msgstr "确定"
+
+msgid "Enter a valid range"
+msgstr "请输入有效的范围"
+
+msgid "Enter a valid range. Read size must be 1-16 KB"
+msgstr "请输入有效的范围，读取大小必须为1-16KB"
+
+msgid "Save successful"
+msgstr "保存成功"
+
+msgid "Save failed"
+msgstr "保存失败"
+
+msgid "The file is too large and can only be previewed in read-only mode"
+msgstr "文件过大，当前仅支持只读预览"
+
+msgid "System folder operations are disabled. This file cannot be saved"
+msgstr "系统文件夹操作已禁用，当前文件不可保存"
+
+msgid "This content has been modified. Discard unsaved changes?"
+msgstr "内容已修改，确定放弃未保存更改吗？"
+
+msgid "Lines"
+msgstr "总行数"
+
+msgid "Line"
+msgstr "当前行"
+
+msgid "Column"
+msgstr "当前列"
+
+msgid "PDF preview"
+msgstr "PDF预览"
+
+msgid "This browser does not support PDF preview"
+msgstr "当前浏览器不支持PDF预览"
+
+msgid "Upload speed"
+msgstr "上传速度"

@@ -1,0 +1,6 @@
+config settings 'main'
+    option view_mode '1'
+    option allow_system_operations '0'
+    option show_hidden_files '0'
+    option home_dir '/tmp/root'
+    option enable_thumbnails '0'
