@@ -75,6 +75,7 @@
 }
 
 .fm-tool-button .fm-tool-image,
+.fm-about-icon .fm-tool-image,
 .fm-menu-image,
 .fm-target-up .fm-target-image {
     display: block;
@@ -92,6 +93,11 @@
 .fm-tool-button .fm-tool-image {
     width: 17px;
     height: 17px;
+}
+
+.fm-about-icon .fm-tool-image {
+    width: 26px;
+    height: 26px;
 }
 
 .fm-address {
@@ -1157,6 +1163,76 @@
 .fm-dialog-close:hover {
     background: var(--fm-hover);
     color: var(--fm-text);
+}
+
+.fm-about-body {
+    padding: 22px 24px 24px;
+}
+
+.fm-about-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.fm-about-icon {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--fm-accent-soft);
+    color: var(--fm-accent);
+    padding: 9px;
+}
+
+.fm-about-name {
+    color: var(--fm-text);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.fm-about-subtitle {
+    margin-top: 4px;
+    color: var(--fm-muted);
+    font-size: 13px;
+}
+
+.fm-about-list {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 10px 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--fm-border);
+    border-bottom: 1px solid var(--fm-border);
+}
+
+.fm-about-label {
+    color: var(--fm-muted);
+}
+
+.fm-about-value {
+    min-width: 0;
+    color: var(--fm-text);
+    overflow-wrap: anywhere;
+}
+
+.fm-about-value a {
+    color: var(--fm-accent);
+    text-decoration: none;
+}
+
+.fm-about-value a:hover {
+    text-decoration: underline;
+}
+
+.fm-about-copyright {
+    margin-top: 16px;
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.6;
 }
 
 .fm-property-body {
@@ -2358,6 +2434,9 @@
         <button id="fm_settings" class="fm-tool-button" type="button" title="<%:Settings%>" aria-label="<%:Settings%>">
             <span class="fm-tool-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/settings.svg')" aria-hidden="true"></span>
         </button>
+        <button id="fm_about" class="fm-tool-button" type="button" title="<%:About%>" aria-label="<%:About%>">
+            <span class="fm-tool-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/about.svg')" aria-hidden="true"></span>
+        </button>
         <div id="fm_address" class="fm-address"></div>
     </div>
 
@@ -2497,6 +2576,33 @@
             <div class="fm-property-label"><%:Type%></div><div id="fm_property_type" class="fm-property-value">-</div>
             <div class="fm-property-label"><%:Size%></div><div id="fm_property_size" class="fm-property-value">-</div>
             <div class="fm-property-label"><%:Modified%></div><div id="fm_property_mtime" class="fm-property-value">-</div>
+        </div>
+    </div>
+</section>
+
+<section id="fm_about_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_about_title">
+    <div class="fm-dialog-header">
+        <div id="fm_about_title" class="fm-dialog-title"><%:About%></div>
+        <button class="fm-dialog-close" type="button" aria-label="<%:Close%>">&times;</button>
+    </div>
+    <div class="fm-about-body">
+        <div class="fm-about-brand">
+            <div class="fm-about-icon" aria-hidden="true">
+                <span class="fm-tool-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/about.svg')"></span>
+            </div>
+            <div>
+                <div class="fm-about-name">Harbor File</div>
+                <div class="fm-about-subtitle"><%:Harbor File is a powerful OpenWrt file management plugin%></div>
+            </div>
+        </div>
+        <div class="fm-about-list">
+            <div class="fm-about-label"><%:Author%></div>
+            <div class="fm-about-value">TT</div>
+            <div class="fm-about-label"><%:Website%></div>
+            <div class="fm-about-value"><a href="https://www.fanchmwrt.com" target="_blank" rel="noopener">www.fanchmwrt.com</a></div>
+        </div>
+        <div class="fm-about-copyright">
+            Copyright &copy; 2026 FanchmWrt. <%:All rights reserved.%>
         </div>
     </div>
 </section>
@@ -5935,6 +6041,10 @@
     document.getElementById('fm_settings').addEventListener('click', function() {
         hide_context_menus();
         open_settings_dialog();
+    });
+    document.getElementById('fm_about').addEventListener('click', function() {
+        hide_context_menus();
+        open_modal('fm_about_dialog');
     });
     var view_buttons = document.querySelectorAll('#fm_view_menu [data-view]');
     for (var view_index = 0; view_index < view_buttons.length; view_index++) {

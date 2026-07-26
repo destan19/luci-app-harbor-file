@@ -587,3 +587,17 @@ msgstr "当前浏览器不支持PDF预览"
 
 msgid "Upload speed"
 msgstr "上传速度"
+msgid "About"
+msgstr "关于"
+
+msgid "Harbor File is a powerful OpenWrt file management plugin"
+msgstr "Harbor File是一款强大的OpenWrt文件管理插件"
+
+msgid "Author"
+msgstr "作者"
+
+msgid "Website"
+msgstr "网站"
+
+msgid "All rights reserved."
+msgstr "保留所有权利。"
