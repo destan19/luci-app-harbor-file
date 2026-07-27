@@ -1,12 +1,7 @@
 module("luci.controller.harbor_file", package.seeall)
 
-local nixio_fs = require "nixio.fs"
-local nixio = require "nixio"
-local jsonc = require "luci.jsonc"
-local i18n = require "luci.i18n"
-local uci = require("luci.model.uci").cursor()
 local unpack = table.unpack or unpack
-local _ = i18n.translate
+_ = require("luci.i18n").translate
 
 local common_directory_entries = {
     { name = "Documents", path_name = "documents", icon = "documents" },
@@ -121,9 +116,9 @@ local max_binary_read_kb = 16
 local max_binary_read_size = max_binary_read_kb * 1024
 local operation_space_margin = 50 * 1024 * 1024
 local upload_safety_margin = operation_space_margin
+local thumbnail_memory_margin = 20 * 1024
 local insufficient_space_message = "available space is less than 50MB, operation is not allowed"
 local video_log_file = "/tmp/harbor_file_video.log"
-local video_log_limit = 262144
 local package_install_state_file = "/tmp/harbor_file_package_install_state.json"
 local package_install_log_file = "/tmp/harbor_file_package_install.log"
 local package_install_log_limit = 131072
@@ -155,7 +150,8 @@ local find_executable
 local is_hidden_file_name
 
 function index()
-    local fwx_dir = nixio_fs.stat("/etc/fwx")
+	local nixio_fs = require "nixio.fs"
+    local fwx_dir = nixio_fs.stat("/etc/fwxd")
     if fwx_dir and fwx_dir.type == "dir" then
         entry({"admin", "fwx_harbor_file"}, template("harbor_file/index"), _("File management"), 16).dependent = true
     else
@@ -195,6 +191,7 @@ function index()
 end
 
 local function write_json(data)
+    local jsonc = require "luci.jsonc"
     luci.http.prepare_content("application/json")
     luci.http.write(jsonc.stringify(data))
 end
@@ -219,6 +216,7 @@ local function write_plain_status(code, reason, message)
 end
 
 local function video_now_ms()
+    local nixio = require "nixio"
     local seconds, microseconds = nixio.gettimeofday()
     return (tonumber(seconds) or 0) * 1000 + math.floor((tonumber(microseconds) or 0) / 1000)
 end
@@ -232,6 +230,8 @@ local function current_timestamp()
 end
 
 local function read_json_file(path)
+    local nixio_fs = require "nixio.fs"
+    local jsonc = require "luci.jsonc"
     local content = nixio_fs.readfile(path)
     if not content or content == "" then
         return nil
@@ -241,6 +241,8 @@ local function read_json_file(path)
 end
 
 local function write_json_file(path, data)
+    local nixio_fs = require "nixio.fs"
+    local jsonc = require "luci.jsonc"
     local content = jsonc.stringify(data)
     if not content then
         return false
@@ -248,10 +250,16 @@ local function write_json_file(path, data)
     return nixio_fs.writefile(path, content)
 end
 
-local function append_log_file(path, message)
-    local fd = io.open(path, "a")
+local function hb_log(log_path, message)
+    local nixio_fs = require "nixio.fs"
+    local stat = nixio_fs.stat(log_path)
+    if stat and (stat.size or 0) >= 262144 then
+        nixio_fs.unlink(log_path .. ".1")
+        os.rename(log_path, log_path .. ".1")
+    end
+    local fd = io.open(log_path, "a")
     if fd then
-        fd:write(string.format("[%s] %s\n", current_timestamp(), tostring(message or "")))
+        fd:write(string.format("[%s] %s\n", os.date("%Y-%m-%d %H:%M:%S"), tostring(message or "")))
         fd:close()
     end
 end
@@ -267,25 +275,13 @@ local function truncate_log_text(content, limit)
 end
 
 local function read_log_file(path, limit)
+    local nixio_fs = require "nixio.fs"
     return truncate_log_text(nixio_fs.readfile(path) or "", limit or package_install_log_limit)
 end
 
 local function shell_quote(value)
     local text = tostring(value or "")
     return "'" .. text:gsub("'", [['"'"']]) .. "'"
-end
-
-local function video_log(message)
-    local stat = nixio_fs.stat(video_log_file)
-    if stat and (stat.size or 0) >= video_log_limit then
-        nixio_fs.unlink(video_log_file .. ".1")
-        os.rename(video_log_file, video_log_file .. ".1")
-    end
-    local fd = io.open(video_log_file, "a")
-    if fd then
-        fd:write(string.format("[%s] %s\n", os.date("%Y-%m-%d %H:%M:%S"), clean_log_value(message)))
-        fd:close()
-    end
 end
 
 local function describe_http_environment()
@@ -382,6 +378,7 @@ local function normalize_home_dir(value)
 end
 
 local function mkdir_p(path)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     if not normalized then
         return false
@@ -410,6 +407,8 @@ local function mkdir_p(path)
 end
 
 local function build_quick_access(preferences)
+    local nixio_fs = require "nixio.fs"
+    local i18n = require "luci.i18n"
     local home_dir = normalize_home_dir(preferences and preferences.home_dir)
     local quick_access = {}
 
@@ -448,12 +447,14 @@ local function to_boolean(value)
 end
 
 local function ensure_preference_section()
+    local uci = require("luci.model.uci").cursor()
     if uci:get("harbor_file", "main") == nil then
         uci:section("harbor_file", "settings", "main", {})
     end
 end
 
 local function read_preference_value(option)
+    local uci = require("luci.model.uci").cursor()
     local ok, value = pcall(function()
         return uci:get("harbor_file", "main", option)
     end)
@@ -487,7 +488,10 @@ local function read_preferences()
 end
 
 local function save_preferences(view_mode, allow_system_operations, show_hidden_files, home_dir, enable_thumbnails)
-    ensure_preference_section()
+    local uci = require("luci.model.uci").cursor()
+    if uci:get("harbor_file", "main") == nil then
+        uci:section("harbor_file", "settings", "main", {})
+    end
     uci:set("harbor_file", "main", "view_mode", tostring(view_mode))
     uci:set("harbor_file", "main", "allow_system_operations", tostring(allow_system_operations))
     uci:set("harbor_file", "main", "show_hidden_files", tostring(show_hidden_files))
@@ -514,6 +518,7 @@ local function system_operations_allowed()
 end
 
 local function read_ttyd_config()
+    local uci = require("luci.model.uci").cursor()
     local config = nil
     pcall(function()
         uci:foreach("ttyd", "ttyd", function(section)
@@ -525,6 +530,7 @@ local function read_ttyd_config()
 end
 
 local function read_ttyd_info()
+    local nixio_fs = require "nixio.fs"
     local config = read_ttyd_config()
     local executable = find_executable("ttyd")
     local init_script = nixio_fs.stat("/etc/init.d/ttyd")
@@ -577,6 +583,7 @@ local function classify_preview(path, name)
 end
 
 find_executable = function(name)
+    local nixio_fs = require "nixio.fs"
     if type(name) ~= "string" or name == "" then
         return nil
     end
@@ -604,6 +611,7 @@ find_executable = function(name)
 end
 
 local function collect_thumbnail_images(path, show_hidden_files)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     local stat = normalized and nixio_fs.stat(normalized) or nil
     if not normalized or not stat or stat.type ~= "dir" then
@@ -638,6 +646,7 @@ local function collect_thumbnail_images(path, show_hidden_files)
 end
 
 local function validate_package_file(path)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     local stat = normalized and nixio_fs.lstat(normalized) or nil
     local package_type = normalized and get_package_type(normalized) or nil
@@ -647,7 +656,31 @@ local function validate_package_file(path)
     return normalized, package_type, nil
 end
 
+local function get_available_memory_kb()
+    local fd = io.open("/proc/meminfo", "r")
+    if not fd then
+        return nil
+    end
+    local available, free, buffers, cached
+    for line in fd:lines() do
+        local key, value = line:match("^(%S+):%s*(%d+)")
+        if key == "MemAvailable" then
+            available = tonumber(value)
+            break
+        elseif key == "MemFree" then
+            free = tonumber(value)
+        elseif key == "Buffers" then
+            buffers = tonumber(value)
+        elseif key == "Cached" then
+            cached = tonumber(value)
+        end
+    end
+    fd:close()
+    return available or (free and (free + (buffers or 0) + (cached or 0))) or nil
+end
+
 local function task_process_running(pid)
+    local nixio_fs = require "nixio.fs"
     local number = tonumber(pid)
     if not number or number <= 0 then
         return false
@@ -852,6 +885,7 @@ local function thumbnail_cache_path(path, stat, preferences)
 end
 
 local function thumbnail_available(path, stat, preferences)
+    local nixio_fs = require "nixio.fs"
     local cache_path = thumbnail_cache_path(path, stat, preferences)
     return cache_path and nixio_fs.stat(cache_path) ~= nil or false
 end
@@ -891,6 +925,7 @@ local function apk_package_installed(path)
 end
 
 local function has_package_index_cache(installer)
+    local nixio_fs = require "nixio.fs"
     local roots = package_index_cache_roots[installer]
     if type(roots) ~= "table" then
         return false
@@ -945,6 +980,8 @@ local function has_package_index_cache(installer)
 end
 
 local function run_package_install_task(task)
+    local nixio_fs = require "nixio.fs"
+    local nixio = require "nixio"
     local executable, args, cmd_err = build_package_install_command(task)
     if not executable then
         task.state = "failed"
@@ -958,12 +995,12 @@ local function run_package_install_task(task)
     end
 
     nixio_fs.writefile(package_install_log_file, "")
-    append_log_file(package_install_log_file, "Start " .. task.installer .. " install: " .. (task.package_name or task.path))
+    hb_log(package_install_log_file, "Start " .. task.installer .. " install: " .. (task.package_name or task.path))
     task.state = "running"
     task.message = _("Checking package index")
     task.pid = nixio.getpid()
     write_package_install_state(task)
-    append_log_file(package_install_log_file, "Checking package index state")
+    hb_log(package_install_log_file, "Checking package index state")
     if not has_package_index_cache(task.installer) then
         local update_executable, update_args, update_err = build_package_index_update_command(task)
         if not update_executable then
@@ -976,12 +1013,12 @@ local function run_package_install_task(task)
             write_package_install_state(task)
             return
         end
-        append_log_file(package_install_log_file, "Package index is not ready, running update")
+        hb_log(package_install_log_file, "Package index is not ready, running update")
         task.message = _("Updating package index")
         write_package_install_state(task)
         local update_exit_code = run_logged_command(update_executable, update_args, package_install_log_file)
         if update_exit_code ~= 0 then
-            append_log_file(package_install_log_file, "Package index update failed with code " .. tostring(update_exit_code))
+            hb_log(package_install_log_file, "Package index update failed with code " .. tostring(update_exit_code))
             task.state = "failed"
             task.done = true
             task.success = false
@@ -991,9 +1028,9 @@ local function run_package_install_task(task)
             write_package_install_state(task)
             return
         end
-        append_log_file(package_install_log_file, "Package index updated successfully")
+        hb_log(package_install_log_file, "Package index updated successfully")
     else
-        append_log_file(package_install_log_file, "Package index is ready")
+        hb_log(package_install_log_file, "Package index is ready")
     end
 
     task.message = _("Installing package")
@@ -1004,9 +1041,9 @@ local function run_package_install_task(task)
     if not success and task.package_type == "apk" and apk_package_installed(task.path) then
         warning_success = true
         success = true
-        append_log_file(package_install_log_file, "apk reported non-zero exit code but target package is installed; treating as success with warnings")
+        hb_log(package_install_log_file, "apk reported non-zero exit code but target package is installed; treating as success with warnings")
     end
-    append_log_file(package_install_log_file, success and "Install finished successfully" or ("Install failed with code " .. tostring(exit_code)))
+    hb_log(package_install_log_file, success and "Install finished successfully" or ("Install failed with code " .. tostring(exit_code)))
 
     task.state = success and "success" or "failed"
     task.done = true
@@ -1018,6 +1055,7 @@ local function run_package_install_task(task)
 end
 
 local function start_package_install_task(task)
+    local nixio = require "nixio"
     local pid = nixio.fork()
     if not pid or pid < 0 then
         return nil, "fork package task failed"
@@ -1032,7 +1070,7 @@ local function start_package_install_task(task)
             task.message = _("Package installation failed")
             task.exit_code = -1
             task.finished_at = current_timestamp()
-            append_log_file(package_install_log_file, "install runtime error: " .. tostring(err))
+            hb_log(package_install_log_file, "install runtime error: " .. tostring(err))
             write_package_install_state(task)
         end
         os.exit(0)
@@ -1049,13 +1087,32 @@ local function read_thumbnail_task_state()
     if not state then
         return nil
     end
-    if (state.state == "pending" or state.state == "running") and not task_process_running(state.pid) then
+    if state.state == "running" and not task_process_running(state.pid) then
         state.state = "failed"
         state.done = true
         state.success = false
         state.message = _("Thumbnail generation ended unexpectedly")
         state.finished_at = state.finished_at or current_timestamp()
         write_json_file(thumbnail_task_state_file, state)
+    elseif state.state == "pending" then
+        local stale = true
+        local started = state.started_at
+        if started then
+            local y, m, d, H, M, S = started:match("(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)")
+            if y then
+                local t = os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d),
+                    hour = tonumber(H), min = tonumber(M), sec = tonumber(S) })
+                stale = os.difftime(os.time(), t) > 30
+            end
+        end
+        if stale then
+            state.state = "failed"
+            state.done = true
+            state.success = false
+            state.message = _("Thumbnail generation ended unexpectedly")
+            state.finished_at = state.finished_at or current_timestamp()
+            write_json_file(thumbnail_task_state_file, state)
+        end
     end
     return state
 end
@@ -1101,15 +1158,17 @@ local function create_thumbnail_task(path, preferences, total)
         failed_count = 0,
         cached_count = 0,
         current_file = "",
+        pid = nil,
         started_at = current_timestamp(),
-        finished_at = nil,
-        pid = nil
+        finished_at = nil
     }
 end
 
 local function build_thumbnail_command(gm_path, source_path, target_path)
-    return gm_path, {
+    local hint = tostring(thumbnail_size * 2) .. "x" .. tostring(thumbnail_size * 2)
+    local gm_args = {
         "convert",
+        "-size", hint,
         source_path,
         "-auto-orient",
         "-thumbnail",
@@ -1117,11 +1176,19 @@ local function build_thumbnail_command(gm_path, source_path, target_path)
         "-background",
         "white",
         "-flatten",
+        "+profile", "*",
+        "-quality", "80",
         target_path
     }
+    local nice_path = find_executable("nice")
+    if nice_path then
+        return nice_path, { "-n", "10", gm_path, unpack(gm_args) }
+    end
+    return gm_path, gm_args
 end
 
 local function run_thumbnail_task(task)
+    local nixio_fs = require "nixio.fs"
     local gm_path = find_executable("gm")
     if not gm_path then
         task.state = "failed"
@@ -1130,7 +1197,7 @@ local function run_thumbnail_task(task)
         task.message = _("GraphicsMagick command not found")
         task.finished_at = current_timestamp()
         write_thumbnail_task_state(task)
-        append_log_file(thumbnail_task_log_file, "gm command not found")
+        hb_log(thumbnail_task_log_file, "gm command not found")
         return
     end
 
@@ -1146,7 +1213,7 @@ local function run_thumbnail_task(task)
         task.message = _("Thumbnail cache directory is not writable")
         task.finished_at = current_timestamp()
         write_thumbnail_task_state(task)
-        append_log_file(thumbnail_task_log_file, "cache directory is not writable")
+        hb_log(thumbnail_task_log_file, "cache directory is not writable")
         return
     end
 
@@ -1158,7 +1225,7 @@ local function run_thumbnail_task(task)
         task.message = err or _("Thumbnail generation failed")
         task.finished_at = current_timestamp()
         write_thumbnail_task_state(task)
-        append_log_file(thumbnail_task_log_file, task.message)
+        hb_log(thumbnail_task_log_file, task.message)
         return
     end
 
@@ -1166,7 +1233,19 @@ local function run_thumbnail_task(task)
     task.message = _("Generating thumbnails")
     task.total = #images
     write_thumbnail_task_state(task)
-    append_log_file(thumbnail_task_log_file, "Start thumbnail generation: " .. task.path)
+    hb_log(thumbnail_task_log_file, "Start thumbnail generation: " .. task.path)
+
+    for _, item in ipairs(images) do
+        local stat = nixio_fs.stat(item.path)
+        local cp = stat and thumbnail_cache_path(item.path, stat, preferences) or nil
+        item.has_cache = cp and nixio_fs.stat(cp) ~= nil or false
+    end
+    table.sort(images, function(a, b)
+        if a.has_cache ~= b.has_cache then
+            return not a.has_cache
+        end
+        return (a.size or 0) < (b.size or 0)
+    end)
 
     for _, item in ipairs(images) do
         task.current_file = item.name
@@ -1176,7 +1255,7 @@ local function run_thumbnail_task(task)
         local cache_path = stat and thumbnail_cache_path(item.path, stat, preferences) or nil
         if cache_path and nixio_fs.stat(cache_path) then
             task.cached_count = task.cached_count + 1
-            append_log_file(thumbnail_task_log_file, "Cached: " .. item.name)
+            hb_log(thumbnail_task_log_file, "Cached: " .. item.name)
         elseif cache_path then
             local temp_path = cache_path .. ".tmp." .. task.task_id
             os.remove(temp_path)
@@ -1184,15 +1263,15 @@ local function run_thumbnail_task(task)
             local exit_code = run_logged_command(executable, args, thumbnail_task_log_file)
             if exit_code == 0 and nixio_fs.stat(temp_path) and os.rename(temp_path, cache_path) then
                 task.success_count = task.success_count + 1
-                append_log_file(thumbnail_task_log_file, "Generated: " .. item.name)
+                hb_log(thumbnail_task_log_file, "Generated: " .. item.name)
             else
                 os.remove(temp_path)
                 task.failed_count = task.failed_count + 1
-                append_log_file(thumbnail_task_log_file, "Failed: " .. item.name .. " code=" .. tostring(exit_code))
+                hb_log(thumbnail_task_log_file, "Failed: " .. item.name .. " code=" .. tostring(exit_code))
             end
         else
             task.failed_count = task.failed_count + 1
-            append_log_file(thumbnail_task_log_file, "Failed: " .. item.name .. " cache path unavailable")
+            hb_log(thumbnail_task_log_file, "Failed: " .. item.name .. " cache path unavailable")
         end
 
         task.processed = task.processed + 1
@@ -1206,16 +1285,21 @@ local function run_thumbnail_task(task)
     task.current_file = ""
     task.finished_at = current_timestamp()
     write_thumbnail_task_state(task)
-    append_log_file(thumbnail_task_log_file, task.message)
+    hb_log(thumbnail_task_log_file, task.message)
 end
 
 local function start_thumbnail_task(task)
+    local nixio = require "nixio"
     local pid = nixio.fork()
     if not pid or pid < 0 then
         return nil, "fork thumbnail task failed"
     end
     if pid == 0 then
         pcall(nixio.setsid)
+        task.pid = nixio.getpid()
+        task.state = "running"
+        task.message = _("Generating thumbnails")
+        write_thumbnail_task_state(task)
         local ok, err = pcall(run_thumbnail_task, task)
         if not ok then
             task.state = "failed"
@@ -1223,15 +1307,11 @@ local function start_thumbnail_task(task)
             task.success = false
             task.message = _("Thumbnail generation failed")
             task.finished_at = current_timestamp()
-            append_log_file(thumbnail_task_log_file, "thumbnail runtime error: " .. tostring(err))
+            hb_log(thumbnail_task_log_file, "thumbnail runtime error: " .. tostring(err))
             write_thumbnail_task_state(task)
         end
         os.exit(0)
     end
-    task.pid = pid
-    task.state = "running"
-    task.message = _("Generating thumbnails")
-    write_thumbnail_task_state(task)
     return pid, nil
 end
 
@@ -1284,6 +1364,7 @@ local function validate_write_request()
 end
 
 local function get_writable_directory(path)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     local stat = normalized and nixio_fs.stat(normalized) or nil
     if not normalized or not stat or stat.type ~= "dir" then
@@ -1296,6 +1377,7 @@ local function get_writable_directory(path)
 end
 
 local function get_directory_available_bytes(path)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     if not normalized then
         return nil, "invalid directory"
@@ -1348,6 +1430,7 @@ local function contains_mount(path, mounts)
 end
 
 local function remove_tree(path)
+    local nixio_fs = require "nixio.fs"
     local stat = nixio_fs.lstat(path)
     if not stat then
         return false, "path not found"
@@ -1370,6 +1453,7 @@ local function remove_tree(path)
 end
 
 local function copy_regular_file(source, target)
+    local nixio_fs = require "nixio.fs"
     local input = io.open(source, "rb")
     if not input then
         return false, "open source file failed"
@@ -1397,6 +1481,7 @@ local function copy_regular_file(source, target)
 end
 
 local function copy_tree(source, target)
+    local nixio_fs = require "nixio.fs"
     local stat = nixio_fs.lstat(source)
     if not stat then
         return false, "source not found"
@@ -1430,6 +1515,7 @@ local function copy_tree(source, target)
 end
 
 local function get_upload_directory(path)
+    local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     if not normalized then
         return nil, nil, "invalid target directory"
@@ -1477,6 +1563,7 @@ is_hidden_file_name = function(name)
 end
 
 local function list_directory(path, preferences)
+    local nixio_fs = require "nixio.fs"
     preferences = preferences or read_preferences()
     local show_hidden_files = preferences.show_hidden_files
     local stat = nixio_fs.stat(path)
@@ -1545,6 +1632,7 @@ local function list_root_folders()
 end
 
 local function drive_name(device, mount_point)
+    local i18n = require "luci.i18n"
     if mount_point == "/" then
         return "System Disk"
     end
@@ -1726,6 +1814,7 @@ function api_list()
 end
 
 function api_create_directory()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -1761,6 +1850,7 @@ function api_create_directory()
 end
 
 function api_create_file()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -1799,6 +1889,7 @@ function api_create_file()
 end
 
 function api_rename()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -1844,6 +1935,7 @@ function api_rename()
 end
 
 function api_delete()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -1875,6 +1967,7 @@ function api_delete()
 end
 
 local function transfer_path(mode)
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -1945,6 +2038,7 @@ local function transfer_path(mode)
 end
 
 local function parse_path_array_param(name)
+    local jsonc = require "luci.jsonc"
     local ok, values = pcall(jsonc.parse, luci.http.formvalue(name) or "")
     if not ok or type(values) ~= "table" or #values == 0 then
         return nil, "invalid path list"
@@ -1953,6 +2047,7 @@ local function parse_path_array_param(name)
 end
 
 local function validate_batch_sources(paths, mode, target_dir)
+    local nixio_fs = require "nixio.fs"
     local seen_paths = {}
     local seen_names = {}
     local items = {}
@@ -1993,6 +2088,7 @@ local function validate_batch_sources(paths, mode, target_dir)
 end
 
 local function transfer_one(mode, item, target_dir)
+    local nixio_fs = require "nixio.fs"
     local source = item.path
     local target = join_path(target_dir, item.name)
     if target == source or nixio_fs.lstat(target) then
@@ -2134,6 +2230,7 @@ function api_batch_delete()
 end
 
 function api_package_install_start()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -2213,9 +2310,24 @@ function api_package_install_status()
 end
 
 function api_thumbnail_generate_start()
+    local nixio_fs = require "nixio.fs"
     if luci.http.getenv("REQUEST_METHOD") ~= "POST" then
         write_json_status(400, "Bad Request", { code = 1, message = "POST required" })
         return
+    end
+
+    local uname_fd = io.popen("uname -m")
+    if uname_fd then
+        local arch = uname_fd:read("*l") or ""
+        uname_fd:close()
+        if arch:lower():find("mips") then
+            write_json_status(501, "Not Supported", {
+                code = 4,
+                message = _("This device does not support thumbnail generation"),
+                data = { arch = arch }
+            })
+            return
+        end
     end
 
     local current = read_thumbnail_task_state()
@@ -2238,6 +2350,16 @@ function api_thumbnail_generate_start()
                 package_name = "graphicsmagick",
                 installer = detect_package_installer()
             }
+        })
+        return
+    end
+
+    local mem_kb = get_available_memory_kb()
+    if mem_kb and mem_kb < thumbnail_memory_margin then
+        write_json_status(507, "Insufficient Memory", {
+            code = 3,
+            message = _("Insufficient memory for thumbnail generation"),
+            data = { available_kb = mem_kb, required_kb = thumbnail_memory_margin }
         })
         return
     end
@@ -2273,26 +2395,24 @@ function api_thumbnail_generate_start()
         return
     end
 
-    local pid, start_err = start_thumbnail_task(task)
+    local pid, fork_err = start_thumbnail_task(task)
     if not pid then
         task.state = "failed"
         task.done = true
         task.success = false
-        task.message = start_err or _("Thumbnail generation failed")
+        task.message = _("Thumbnail generation failed")
         task.finished_at = current_timestamp()
+        hb_log(thumbnail_task_log_file, "fork failed: " .. tostring(fork_err))
         write_thumbnail_task_state(task)
         write_json_status(500, "Thumbnail Failed", { code = 1, message = task.message })
         return
     end
 
-    write_json({
-        code = 0,
-        message = "success",
-        data = build_thumbnail_task_response(task)
-    })
+    write_json({ code = 0, message = "success", data = build_thumbnail_task_response(task) })
 end
 
 function api_thumbnail_tool_install_start()
+    local nixio_fs = require "nixio.fs"
     if not validate_write_request() then
         return
     end
@@ -2376,6 +2496,7 @@ end
 
 
 local function validate_preview_file(path, expected_type)
+    local nixio_fs = require "nixio.fs"
     if not path then
         return nil, "invalid path"
     end
@@ -2404,6 +2525,7 @@ local function validate_text_edit_file(path)
 end
 
 local function write_text_atomic(path, content, source_stat)
+    local nixio_fs = require "nixio.fs"
     local file_name = path:match("([^/]+)$") or "text"
     local parent = parent_path(path)
     local temp_path = join_path(
@@ -2441,6 +2563,7 @@ local function write_text_atomic(path, content, source_stat)
 end
 
 local function validate_download_file(path)
+    local nixio_fs = require "nixio.fs"
     if not path then
         return nil, "invalid path"
     end
@@ -2496,9 +2619,7 @@ function api_download()
         if not data or #data == 0 then
             break
         end
-        if not pcall(luci.http.write, data) then
-            break
-        end
+        luci.http.write(data)
     end
 
     fd:close()
@@ -2540,6 +2661,7 @@ function api_read_text()
 end
 
 function api_read_binary()
+    local nixio_fs = require "nixio.fs"
     local path = normalize_path(luci.http.formvalue("path"))
     local stat = path and nixio_fs.stat(path) or nil
     if not path or not stat or stat.type ~= "reg" then
@@ -2686,36 +2808,47 @@ end
 
 function api_image()
     local path = normalize_path(luci.http.formvalue("path"))
+    local request_id = "image-" .. tostring(math.floor(video_now_ms() or 0))
+    hb_log(video_log_file, request_id .. " begin raw_path=" .. clean_log_value(luci.http.formvalue("path")) .. " path=" .. clean_log_value(path))
     local stat, err = validate_preview_file(path, "image")
     if not stat then
+        hb_log(video_log_file, request_id .. " reject path=" .. clean_log_value(path) .. " error=" .. clean_log_value(err))
         write_plain_status(400, "Bad Request", err)
         return
     end
 
     local fd = io.open(path, "rb")
     if not fd then
+        hb_log(video_log_file, request_id .. " open_failed path=" .. clean_log_value(path))
         write_plain_status(500, "Internal Server Error", "open file failed")
         return
     end
 
+    local mime = image_mime_map[get_ext(path)] or "application/octet-stream"
     set_status(200, "OK")
+    luci.http.header("X-Content-Type-Options", "nosniff")
     luci.http.header("Content-Length", tostring(stat.size or 0))
     luci.http.header("Cache-Control", "no-store")
-    luci.http.prepare_content(image_mime_map[get_ext(path)])
+    luci.http.header("Content-Disposition", "inline")
+    luci.http.prepare_content(mime)
+    hb_log(video_log_file, request_id .. " response path=" .. clean_log_value(path) .. " size=" .. tostring(stat.size or 0) .. " mime=" .. mime)
 
+    local sent = 0
+    local write_error = ""
     while true do
         local data = fd:read(65536)
         if not data or #data == 0 then
             break
         end
-        if not pcall(luci.http.write, data) then
-            break
-        end
+        luci.http.write(data)
+        sent = sent + #data
     end
     fd:close()
+    hb_log(video_log_file, request_id .. " done path=" .. clean_log_value(path) .. " sent=" .. tostring(sent) .. " error=" .. clean_log_value(write_error))
 end
 
 function api_thumbnail()
+    local nixio_fs = require "nixio.fs"
     local path = normalize_path(luci.http.formvalue("path"))
     local stat, err = validate_preview_file(path, "image")
     if not stat then
@@ -2747,9 +2880,7 @@ function api_thumbnail()
         if not data or #data == 0 then
             break
         end
-        if not pcall(luci.http.write, data) then
-            break
-        end
+        luci.http.write(data)
     end
     fd:close()
 end
@@ -2779,9 +2910,7 @@ function api_pdf()
         if not data or #data == 0 then
             break
         end
-        if not pcall(luci.http.write, data) then
-            break
-        end
+        luci.http.write(data)
     end
     fd:close()
 end
@@ -2872,9 +3001,7 @@ local function stream_file(fd, content_length)
         if not data or #data == 0 then
             return sent, first_write_ms, "unexpected end of file"
         end
-        if not pcall(luci.http.write, data) then
-            return sent, first_write_ms, "client write failed"
-        end
+        luci.http.write(data)
         if not first_write_ms then
             first_write_ms = video_now_ms()
         end
@@ -2890,7 +3017,7 @@ function api_video()
     local path = normalize_path(luci.http.formvalue("path"))
     local stat, err = validate_preview_file(path, "video")
     if not stat then
-        video_log(request_id .. " reject path=" .. clean_log_value(path) .. " error=" .. clean_log_value(err))
+        hb_log(video_log_file, request_id .. " reject path=" .. clean_log_value(path) .. " error=" .. clean_log_value(err))
         write_plain_status(400, "Bad Request", err)
         return
     end
@@ -2902,11 +3029,11 @@ function api_video()
     end
 
     local range_value, range_source, range_candidates = get_request_range()
-    video_log(request_id .. " begin method=" .. clean_log_value(luci.http.getenv("REQUEST_METHOD")) ..
+    hb_log(video_log_file, request_id .. " begin method=" .. clean_log_value(luci.http.getenv("REQUEST_METHOD")) ..
         " path=" .. clean_log_value(path) .. " size=" .. tostring(file_size) ..
         " range_source=" .. range_source .. " range=" .. clean_log_value(range_value) ..
         " candidates=" .. range_candidates)
-    video_log(request_id .. " " .. describe_http_environment())
+    hb_log(video_log_file, request_id .. " " .. describe_http_environment())
     local start_pos, end_pos, partial = build_video_range(file_size, range_value)
     luci.http.header("X-FS-Range-Source", range_source)
     if start_pos == nil then
@@ -2919,13 +3046,13 @@ function api_video()
 
     local fd = io.open(path, "rb")
     if not fd then
-        video_log(request_id .. " open_failed elapsed_ms=" .. tostring(video_now_ms() - request_started))
+        hb_log(video_log_file, request_id .. " open_failed elapsed_ms=" .. tostring(video_now_ms() - request_started))
         write_plain_status(500, "Internal Server Error", "open file failed")
         return
     end
     if not fd:seek("set", start_pos) then
         fd:close()
-        video_log(request_id .. " seek_failed start=" .. tostring(start_pos))
+        hb_log(video_log_file, request_id .. " seek_failed start=" .. tostring(start_pos))
         write_plain_status(500, "Internal Server Error", "seek file failed")
         return
     end
@@ -2940,13 +3067,13 @@ function api_video()
     luci.http.header("Content-Length", tostring(content_length))
     luci.http.header("Cache-Control", "private, max-age=60")
     luci.http.prepare_content(video_mime_map[get_ext(path)])
-    video_log(request_id .. " response status=" .. (partial and "206" or "200") ..
+    hb_log(video_log_file, request_id .. " response status=" .. (partial and "206" or "200") ..
         " start=" .. tostring(start_pos) .. " end=" .. tostring(end_pos) ..
         " length=" .. tostring(content_length) .. " header_ms=" .. tostring(video_now_ms() - request_started))
 
     if luci.http.getenv("REQUEST_METHOD") ~= "HEAD" then
         local sent, first_write_ms, stream_err = stream_file(fd, content_length)
-        video_log(request_id .. " stream_done sent=" .. tostring(sent) ..
+        hb_log(video_log_file, request_id .. " stream_done sent=" .. tostring(sent) ..
             " first_write_ms=" .. tostring(first_write_ms and first_write_ms - request_started or -1) ..
             " total_ms=" .. tostring(video_now_ms() - request_started) ..
             " error=" .. clean_log_value(stream_err))
@@ -2955,6 +3082,7 @@ function api_video()
 end
 
 function api_video_log()
+    local nixio_fs = require "nixio.fs"
     local content = nixio_fs.readfile(video_log_file) or ""
     if #content > 65536 then
         content = content:sub(#content - 65535)
@@ -2964,6 +3092,7 @@ function api_video_log()
 end
 
 local function find_upload_conflicts(target_dir, names)
+    local nixio_fs = require "nixio.fs"
     local conflicts = {}
     local blocked = {}
     for _, name in ipairs(names) do
@@ -3035,6 +3164,7 @@ local function close_upload_file(state)
 end
 
 local function cleanup_upload(state)
+    local nixio_fs = require "nixio.fs"
     close_upload_file(state)
     if state.temp_path then
         nixio_fs.unlink(state.temp_path)
@@ -3051,6 +3181,7 @@ local function fail_upload(state, status, message)
 end
 
 local function start_upload_file(state, meta)
+    local nixio_fs = require "nixio.fs"
     if state.started then
         fail_upload(state, 400, "only one file is allowed per request")
         return false
@@ -3091,6 +3222,7 @@ local function start_upload_file(state, meta)
 end
 
 local function finish_upload_file(state)
+    local nixio_fs = require "nixio.fs"
     close_upload_file(state)
     if state.written ~= state.expected_size then
         fail_upload(state, 400, "uploaded file size does not match")
