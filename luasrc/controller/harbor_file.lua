@@ -90,6 +90,25 @@ local package_ext_map = {
     }
 }
 
+local harbor_log_file = "/tmp/log/harbor_file.log"
+local harbor_debug_log = os.getenv("HARBOR_FILE_DEBUG") == "1"
+
+archive = {
+    state_file = "/tmp/harbor_file_archive_state.json",
+    log_file = harbor_log_file,
+    log_limit = 131072,
+    create_formats = {
+        ["tar.gz"] = { extension = ".tar.gz", command = "tar", title = "TAR.GZ" }
+    },
+    extract_formats = {
+        zip = { command = "unzip", title = "ZIP", container = true },
+        tar = { command = "tar", title = "TAR", container = true },
+        ["tar.gz"] = { command = "tar", title = "TAR.GZ", container = true },
+        tgz = { command = "tar", title = "TGZ", container = true, canonical = "tar.gz" },
+        gz = { command = "gzip", title = "GZ", single_file = true }
+    }
+}
+
 local package_index_cache_roots = {
     opkg = {
         "/tmp/opkg-lists",
@@ -114,19 +133,81 @@ local max_text_size = 524288
 local default_binary_read_kb = 16
 local max_binary_read_kb = 16
 local max_binary_read_size = max_binary_read_kb * 1024
-local operation_space_margin = 50 * 1024 * 1024
-local upload_safety_margin = operation_space_margin
+local operation_space_ratio = 0.05
 local thumbnail_memory_margin = 20 * 1024
-local insufficient_space_message = "available space is less than 50MB, operation is not allowed"
-local video_log_file = "/tmp/harbor_file_video.log"
+local insufficient_space_message = "available space is less than 5% of the current partition, operation is not allowed"
 local package_install_state_file = "/tmp/harbor_file_package_install_state.json"
-local package_install_log_file = "/tmp/harbor_file_package_install.log"
+local package_install_log_file = harbor_log_file
+local preferences_log_file = harbor_log_file
 local package_install_log_limit = 131072
 local thumbnail_task_state_file = "/tmp/harbor_file_thumbnail_state.json"
-local thumbnail_task_log_file = "/tmp/harbor_file_thumbnail.log"
+local thumbnail_task_log_file = harbor_log_file
 local thumbnail_task_log_limit = 65536
 local thumbnail_size = 128
 local thumbnail_cache_version = "contain-v2"
+local nginx_template_file = "/etc/nginx/uci.conf.template"
+local nginx_insert_anchor = "large_client_header_buffers"
+local nginx_package_name = "luci-nginx"
+local terminal_package_name = "ttyd"
+local uwsgi_config_file = "/etc/uwsgi/vassals/luci-webui.ini"
+local uhttpd_script_timeout_default = 600
+local uhttpd_network_timeout_default = 600
+local uwsgi_configuration_options = {
+    {
+        name = "reload-on-as",
+        preference = "reload-on-as",
+        enabled_preference = "reload-on-as_enabled",
+        default_value = 256,
+        default_enabled = 0
+    },
+    {
+        name = "reload-on-rss",
+        preference = "reload-on-rss",
+        enabled_preference = "reload-on-rss_enabled",
+        default_value = 192,
+        default_enabled = 0
+    },
+    {
+        name = "post-buffering",
+        preference = "post-buffering",
+        default_value = 8192
+    },
+    {
+        name = "limit-as",
+        preference = "limit-as",
+        default_value = 1000
+    },
+    {
+        name = "reload-mercy",
+        preference = "reload-mercy",
+        default_value = 8
+    },
+    {
+        name = "buffer-size",
+        preference = "buffer-size",
+        default_value = 10000
+    }
+}
+local nginx_configuration_options = {
+    {
+        preference = "uwsgi_request_buffering",
+        directive = "uwsgi_request_buffering",
+        values = {
+            [0] = "off",
+            [1] = "on"
+        }
+    },
+    {
+        preference = "client_max_body_size",
+        directive = "client_max_body_size",
+        value = function(preference_value)
+            if preference_value == 0 then
+                return "0"
+            end
+            return tostring(preference_value) .. "M"
+        end
+    }
+}
 local preference_defaults = {
     view_mode = 1,
     allow_system_operations = 0,
@@ -151,8 +232,7 @@ local is_hidden_file_name
 
 function index()
 	local nixio_fs = require "nixio.fs"
-    local fwx_dir = nixio_fs.stat("/etc/fwxd")
-    if fwx_dir and fwx_dir.type == "dir" then
+    if nixio_fs.access("/etc/fwx_release") then
         entry({"admin", "fwx_harbor_file"}, template("harbor_file/index"), _("File management"), 16).dependent = true
     else
         entry({"admin", "harbor_file"}, alias("admin", "system", "harbor_file"), nil).leaf = true
@@ -162,6 +242,7 @@ function index()
     entry({"admin", "local_fs", "terminal_info"}, call("api_terminal_info"), nil).leaf = true
     entry({"admin", "local_fs", "preferences"}, call("api_preferences"), nil).leaf = true
     entry({"admin", "local_fs", "save_preferences"}, call("api_save_preferences"), nil).leaf = true
+    entry({"admin", "local_fs", "nginx_install_start"}, call("api_nginx_install_start"), nil).leaf = true
     entry({"admin", "local_fs", "list"}, call("api_list"), nil).leaf = true
     entry({"admin", "local_fs", "download"}, call("api_download"), nil).leaf = true
     entry({"admin", "local_fs", "read_text"}, call("api_read_text"), nil).leaf = true
@@ -172,9 +253,10 @@ function index()
     entry({"admin", "local_fs", "thumbnail_generate_start"}, call("api_thumbnail_generate_start"), nil).leaf = true
     entry({"admin", "local_fs", "thumbnail_generate_status"}, call("api_thumbnail_generate_status"), nil).leaf = true
     entry({"admin", "local_fs", "thumbnail_tool_install_start"}, call("api_thumbnail_tool_install_start"), nil).leaf = true
+    entry({"admin", "local_fs", "terminal_tool_install_start"}, call("api_terminal_tool_install_start"), nil).leaf = true
     entry({"admin", "local_fs", "pdf"}, call("api_pdf"), nil).leaf = true
     entry({"admin", "local_fs", "video"}, call("api_video"), nil).leaf = true
-    entry({"admin", "local_fs", "video_log"}, call("api_video_log"), nil).leaf = true
+    entry({"admin", "local_fs", "video_check"}, call("api_video_check"), nil).leaf = true
     entry({"admin", "local_fs", "upload_check"}, call("api_upload_check"), nil).leaf = true
     entry({"admin", "local_fs", "upload"}, call("api_upload"), nil).leaf = true
     entry({"admin", "local_fs", "create_directory"}, call("api_create_directory"), nil).leaf = true
@@ -186,6 +268,9 @@ function index()
     entry({"admin", "local_fs", "batch_copy"}, call("api_batch_copy"), nil).leaf = true
     entry({"admin", "local_fs", "batch_move"}, call("api_batch_move"), nil).leaf = true
     entry({"admin", "local_fs", "batch_delete"}, call("api_batch_delete"), nil).leaf = true
+    entry({"admin", "local_fs", "archive_create_start"}, call("api_archive_create_start"), nil).leaf = true
+    entry({"admin", "local_fs", "archive_extract_start"}, call("api_archive_extract_start"), nil).leaf = true
+    entry({"admin", "local_fs", "archive_status"}, call("api_archive_status"), nil).leaf = true
     entry({"admin", "local_fs", "package_install_start"}, call("api_package_install_start"), nil).leaf = true
     entry({"admin", "local_fs", "package_install_status"}, call("api_package_install_status"), nil).leaf = true
 end
@@ -252,6 +337,10 @@ end
 
 local function hb_log(log_path, message)
     local nixio_fs = require "nixio.fs"
+    log_path = harbor_log_file
+    if not nixio_fs.stat("/tmp/log") then
+        nixio_fs.mkdir("/tmp/log")
+    end
     local stat = nixio_fs.stat(log_path)
     if stat and (stat.size or 0) >= 262144 then
         nixio_fs.unlink(log_path .. ".1")
@@ -261,6 +350,12 @@ local function hb_log(log_path, message)
     if fd then
         fd:write(string.format("[%s] %s\n", os.date("%Y-%m-%d %H:%M:%S"), tostring(message or "")))
         fd:close()
+    end
+end
+
+local function preference_log(message)
+    if harbor_debug_log then
+        hb_log(preferences_log_file, clean_log_value(message))
     end
 end
 
@@ -276,31 +371,13 @@ end
 
 local function read_log_file(path, limit)
     local nixio_fs = require "nixio.fs"
+    path = harbor_log_file
     return truncate_log_text(nixio_fs.readfile(path) or "", limit or package_install_log_limit)
 end
 
 local function shell_quote(value)
     local text = tostring(value or "")
     return "'" .. text:gsub("'", [['"'"']]) .. "'"
-end
-
-local function describe_http_environment()
-    local ok, environment = pcall(luci.http.getenv)
-    if not ok or type(environment) ~= "table" then
-        return "env_table=" .. (ok and type(environment) or "error")
-    end
-    local keys = {}
-    local ranges = {}
-    for key, value in pairs(environment) do
-        local name = tostring(key)
-        table.insert(keys, name)
-        if name:upper():find("RANGE", 1, true) then
-            table.insert(ranges, name .. "=" .. clean_log_value(value))
-        end
-    end
-    table.sort(keys)
-    table.sort(ranges)
-    return "range_values=" .. table.concat(ranges, ",") .. " env_keys=" .. table.concat(keys, ",")
 end
 
 local function normalize_path(path)
@@ -441,13 +518,41 @@ local function normalize_port_number(value, default_value)
     return number
 end
 
+local function normalize_nginx_body_size(value, default_value)
+    local number = tonumber(value)
+    if not number then
+        return default_value
+    end
+    number = math.floor(number)
+    if number < 0 or number > 1024 then
+        return default_value
+    end
+    return number
+end
+
+local function normalize_integer_value(value, default_value)
+    local number = tonumber(value)
+    if not number then
+        return default_value
+    end
+    return math.floor(number)
+end
+
+local function normalize_timeout_value(value, default_value)
+    local number = normalize_integer_value(value, default_value)
+    if number < 0 then
+        return default_value
+    end
+    return number
+end
+
 local function to_boolean(value)
     local text = tostring(value or ""):lower()
     return text == "1" or text == "true" or text == "yes" or text == "on"
 end
 
-local function ensure_preference_section()
-    local uci = require("luci.model.uci").cursor()
+local function ensure_preference_section(uci)
+    uci = uci or require("luci.model.uci").cursor()
     if uci:get("harbor_file", "main") == nil then
         uci:section("harbor_file", "settings", "main", {})
     end
@@ -459,6 +564,39 @@ local function read_preference_value(option)
         return uci:get("harbor_file", "main", option)
     end)
     return ok and value or nil
+end
+
+local function detect_web_server()
+    local process = io.popen("ps ww 2>/dev/null || ps w 2>/dev/null || ps 2>/dev/null", "r")
+    if not process then
+        return "unknown"
+    end
+
+    local nginx_running = false
+    local uhttpd_running = false
+    for line in process:lines() do
+        local command = line:lower()
+        if command:find("nginx:", 1, true) or command:find("/nginx", 1, true) or
+                command:match("%snginx%s") then
+            nginx_running = true
+        elseif command:find("/uhttpd", 1, true) or command:match("%suhttpd%s") then
+            uhttpd_running = true
+        end
+    end
+    process:close()
+
+    if nginx_running then
+        return "nginx"
+    end
+    if uhttpd_running then
+        return "uhttpd"
+    end
+    return "unknown"
+end
+
+local function is_fanchmwrt_system()
+    local nixio_fs = require "nixio.fs"
+    return nixio_fs.access("/etc/fwx_release") and 1 or 0
 end
 
 local function read_preferences()
@@ -487,11 +625,118 @@ local function read_preferences()
     }
 end
 
-local function save_preferences(view_mode, allow_system_operations, show_hidden_files, home_dir, enable_thumbnails)
-    local uci = require("luci.model.uci").cursor()
-    if uci:get("harbor_file", "main") == nil then
-        uci:section("harbor_file", "settings", "main", {})
+local function read_uwsgi_preferences(include_state)
+    local nixio_fs = require "nixio.fs"
+    local content = nixio_fs.readfile(uwsgi_config_file)
+    local preferences = {
+        uwsgi_config_available = content ~= nil
+    }
+    if include_state then
+        preferences._present = {}
     end
+
+    for _, option in ipairs(uwsgi_configuration_options) do
+        preferences[option.preference] = option.default_value
+        if option.enabled_preference then
+            preferences[option.enabled_preference] = option.default_enabled
+        end
+    end
+
+    if not content then
+        return preferences
+    end
+
+    for line in content:gmatch("[^\r\n]+") do
+        for _, option in ipairs(uwsgi_configuration_options) do
+            local pattern = option.name:gsub("%-", "%%-")
+            local disabled, value = line:match("^%s*(;?)%s*" .. pattern .. "%s*=%s*([+-]?%d+)")
+            if value then
+                if include_state then
+                    preferences._present[option.preference] = true
+                end
+                preferences[option.preference] = normalize_integer_value(value, option.default_value)
+                if option.enabled_preference then
+                    preferences[option.enabled_preference] = disabled == ";" and 0 or 1
+                end
+            end
+        end
+    end
+
+    return preferences
+end
+
+local function read_nginx_preferences()
+    local nixio_fs = require "nixio.fs"
+    local content = nixio_fs.readfile(nginx_template_file)
+    local preferences = {
+        nginx_config_available = content ~= nil,
+        uwsgi_request_buffering = 0,
+        client_max_body_size = 128
+    }
+
+    if not content then
+        return preferences
+    end
+
+    for line in content:gmatch("[^\r\n]+") do
+        local buffering = line:match("^%s*uwsgi_request_buffering%s+([^;]+);%s*$")
+        if buffering then
+            buffering = tostring(buffering):lower():match("^%s*(.-)%s*$")
+            preferences.uwsgi_request_buffering = buffering == "on" and 1 or 0
+        end
+
+        local body_size = line:match("^%s*client_max_body_size%s+([^;]+);%s*$")
+        if body_size then
+            body_size = tostring(body_size):lower():match("^%s*(.-)%s*$")
+            if body_size == "0" then
+                preferences.client_max_body_size = 0
+            else
+                preferences.client_max_body_size = normalize_nginx_body_size(
+                    body_size:match("^(%d+)m$") or body_size:match("^(%d+)$"),
+                    preferences.client_max_body_size
+                )
+            end
+        end
+    end
+
+    return preferences
+end
+
+local function read_uhttpd_preferences()
+    local nixio_fs = require "nixio.fs"
+    local uci = require("luci.model.uci").cursor()
+    local preferences = {
+        uhttpd_config_available = nixio_fs.access("/etc/config/uhttpd") == true,
+        uhttpd_script_timeout = uhttpd_script_timeout_default,
+        uhttpd_network_timeout = uhttpd_network_timeout_default
+    }
+
+    local ok, script_timeout = pcall(function()
+        return uci:get("uhttpd", "main", "script_timeout")
+    end)
+    if ok then
+        preferences.uhttpd_script_timeout = normalize_timeout_value(
+            script_timeout,
+            preferences.uhttpd_script_timeout
+        )
+    end
+
+    local network_ok, network_timeout = pcall(function()
+        return uci:get("uhttpd", "main", "network_timeout")
+    end)
+    if network_ok then
+        preferences.uhttpd_network_timeout = normalize_timeout_value(
+            network_timeout,
+            preferences.uhttpd_network_timeout
+        )
+    end
+
+    return preferences
+end
+
+local function save_basic_preferences(view_mode, allow_system_operations, show_hidden_files, home_dir, enable_thumbnails)
+    local uci = require("luci.model.uci").cursor()
+    ensure_preference_section(uci)
     uci:set("harbor_file", "main", "view_mode", tostring(view_mode))
     uci:set("harbor_file", "main", "allow_system_operations", tostring(allow_system_operations))
     uci:set("harbor_file", "main", "show_hidden_files", tostring(show_hidden_files))
@@ -755,6 +1000,16 @@ local function detect_package_installer()
     return nil
 end
 
+local function detect_nginx_installer()
+    if find_executable("apk") then
+        return "apk"
+    end
+    if find_executable("opkg") then
+        return "opkg"
+    end
+    return nil
+end
+
 local function create_repository_install_task(package_name, installer)
     local task_id = string.format("%s-%d", tostring(math.floor(video_now_ms() or 0)), math.floor(os.time() % 100000))
     return {
@@ -836,9 +1091,269 @@ local function parse_execute_result(...)
     return -1
 end
 
+local function replace_nginx_directive(content, directive, value)
+    local count = 0
+    local updated = content:gsub(
+        "([^\r\n]+)",
+        function(line)
+            local indent = line:match("^([ \t]*)" .. directive .. "%s+[^;]+;%s*$")
+            if indent and count == 0 then
+                count = 1
+                return indent .. directive .. " " .. value .. ";"
+            end
+            return line
+        end
+    )
+    return updated, count > 0
+end
+
+local function insert_nginx_directive(content, directive, value)
+    local count = 0
+    local updated = content:gsub(
+        "([^\r\n]+)",
+        function(line)
+            local indent = line:match("^([ \t]*)" .. nginx_insert_anchor .. "%s+[^;]+;%s*$")
+            if indent and count == 0 then
+                count = 1
+                return line .. "\n" .. indent .. directive .. " " .. value .. ";"
+            end
+            return line
+        end
+    )
+    return updated, count > 0
+end
+
+local function set_nginx_directive(content, directive, value)
+    local updated, found = replace_nginx_directive(content, directive, value)
+    if found then
+        return updated, true
+    end
+    return insert_nginx_directive(updated, directive, value)
+end
+
+local function backup_config_file(path, content)
+    local nixio_fs = require "nixio.fs"
+    local backup_path = path .. ".harbor_file.bak"
+    if not nixio_fs.writefile(backup_path, content) then
+        return nil
+    end
+    return backup_path
+end
+
+local function restore_config_file(path, content)
+    local nixio_fs = require "nixio.fs"
+    return nixio_fs.writefile(path, content)
+end
+
+local function schedule_uwsgi_restart()
+    local result = os.execute("(sleep 1; /etc/init.d/uwsgi restart >/dev/null 2>&1) >/dev/null 2>&1 &")
+    return result ~= false and result ~= nil
+end
+
+local function read_uwsgi_form_preferences(current)
+    local preferences = {}
+    current = current or read_uwsgi_preferences()
+
+    for _, option in ipairs(uwsgi_configuration_options) do
+        preferences[option.preference] = normalize_integer_value(
+            luci.http.formvalue(option.preference),
+            current[option.preference] or option.default_value
+        )
+        if option.enabled_preference then
+            preferences[option.enabled_preference] = normalize_preference_number(
+                luci.http.formvalue(option.enabled_preference),
+                current[option.enabled_preference] or option.default_enabled,
+                valid_boolean_values
+            )
+        end
+    end
+
+    return preferences
+end
+
+local function uwsgi_preferences_changed(current, target)
+    local present = current._present or {}
+    for _, option in ipairs(uwsgi_configuration_options) do
+        if not present[option.preference] then
+            return true
+        end
+        if current[option.preference] ~= target[option.preference] then
+            return true
+        end
+        if option.enabled_preference and current[option.enabled_preference] ~= target[option.enabled_preference] then
+            return true
+        end
+    end
+    return false
+end
+
+local function save_uwsgi_configuration(target)
+    local nixio_fs = require "nixio.fs"
+    local content = nixio_fs.readfile(uwsgi_config_file)
+    if not content then
+        return nil, _("uWSGI configuration file was not found")
+    end
+
+    local current = read_uwsgi_preferences(true)
+    if not uwsgi_preferences_changed(current, target) then
+        return true
+    end
+
+    local backup_path = backup_config_file(uwsgi_config_file, content)
+    if not backup_path then
+        return nil, _("Failed to backup uWSGI configuration")
+    end
+
+    local commands = {}
+    for _, option in ipairs(uwsgi_configuration_options) do
+        local disabled = option.enabled_preference and target[option.enabled_preference] ~= 1
+        local prefix = disabled and ";" or ""
+        local line = prefix .. option.name .. " = " .. tostring(target[option.preference])
+        table.insert(commands, "sed -i " .. shell_quote("/^[;[:space:]]*" .. option.name .. "[[:space:]]*=.*/d") ..
+            " " .. shell_quote(uwsgi_config_file))
+        table.insert(commands, "echo " .. shell_quote(line) .. " >> " .. shell_quote(uwsgi_config_file))
+    end
+
+    if parse_execute_result(os.execute(table.concat(commands, " && "))) ~= 0 then
+        restore_config_file(uwsgi_config_file, content)
+        return nil, _("Failed to update uWSGI configuration")
+    end
+    if not schedule_uwsgi_restart() then
+        restore_config_file(uwsgi_config_file, content)
+        return nil, _("Failed to restart uWSGI")
+    end
+    nixio_fs.unlink(backup_path)
+    return true
+end
+
+local function schedule_nginx_restart()
+    local result = os.execute("(sleep 1; /etc/init.d/nginx restart >/dev/null 2>&1) >/dev/null 2>&1 &")
+    return result ~= false and result ~= nil
+end
+
+local function schedule_uhttpd_restart()
+    local result = os.execute("(sleep 1; /etc/init.d/uhttpd restart >/dev/null 2>&1) >/dev/null 2>&1 &")
+    return result ~= false and result ~= nil
+end
+
+local function read_uhttpd_form_preferences(current)
+    current = current or read_uhttpd_preferences()
+    return {
+        uhttpd_script_timeout = normalize_timeout_value(
+            luci.http.formvalue("uhttpd_script_timeout"),
+            current.uhttpd_script_timeout or uhttpd_script_timeout_default
+        ),
+        uhttpd_network_timeout = normalize_timeout_value(
+            luci.http.formvalue("uhttpd_network_timeout"),
+            current.uhttpd_network_timeout or uhttpd_network_timeout_default
+        )
+    }
+end
+
+local function ensure_uhttpd_section(uci)
+    local ok, section = pcall(function()
+        return uci:get("uhttpd", "main")
+    end)
+    if not ok or section == nil then
+        uci:section("uhttpd", "uhttpd", "main", {})
+    end
+end
+
+local function save_uhttpd_configuration(target)
+    local uci = require("luci.model.uci").cursor()
+    ensure_uhttpd_section(uci)
+    uci:set("uhttpd", "main", "script_timeout", tostring(target.uhttpd_script_timeout))
+    uci:set("uhttpd", "main", "network_timeout", tostring(target.uhttpd_network_timeout))
+    if not uci:commit("uhttpd") then
+        return nil, _("Failed to update uHTTPd configuration")
+    end
+    if not schedule_uhttpd_restart() then
+        return nil, _("Failed to restart uHTTPd")
+    end
+    return true
+end
+
+local function read_nginx_form_preferences(current)
+    current = current or read_nginx_preferences()
+    return {
+        uwsgi_request_buffering = normalize_preference_number(
+            luci.http.formvalue("uwsgi_request_buffering"),
+            current.uwsgi_request_buffering,
+            valid_boolean_values
+        ),
+        client_max_body_size = normalize_nginx_body_size(
+            luci.http.formvalue("client_max_body_size"),
+            current.client_max_body_size
+        )
+    }
+end
+
+local function test_nginx_configuration()
+    local command = "nginx -t -c " .. shell_quote(nginx_template_file) .. " >/dev/null 2>&1"
+    return parse_execute_result(os.execute(command)) == 0
+end
+
+local function save_nginx_configuration(target)
+    local nixio_fs = require "nixio.fs"
+    local content = nixio_fs.readfile(nginx_template_file)
+    if not content then
+        return nil, _("Nginx configuration template was not found")
+    end
+
+    local updated = content
+    for _, option in ipairs(nginx_configuration_options) do
+        local preference_value = target[option.preference]
+        local value = option.value and option.value(preference_value) or option.values[preference_value]
+        local found
+        updated, found = set_nginx_directive(updated, option.directive, value)
+    end
+    if updated == content then
+        return true
+    end
+
+    local backup_path = backup_config_file(nginx_template_file, content)
+    if not backup_path then
+        return nil, _("Failed to backup Nginx configuration")
+    end
+    if not nixio_fs.writefile(nginx_template_file, updated) then
+        restore_config_file(nginx_template_file, content)
+        return nil, _("Failed to update Nginx configuration")
+    end
+    if not test_nginx_configuration() then
+        restore_config_file(nginx_template_file, content)
+        return nil, _("Nginx configuration test failed")
+    end
+    if not schedule_nginx_restart() then
+        restore_config_file(nginx_template_file, content)
+        return nil, _("Failed to restart Nginx")
+    end
+    nixio_fs.unlink(backup_path)
+    return true
+end
+
 local function run_logged_command(executable, args, log_path)
-    local command = command_to_shell(executable, args) .. " >> " .. shell_quote(log_path) .. " 2>&1"
+    log_path = harbor_log_file
+    local command = "mkdir -p /tmp/log; " .. command_to_shell(executable, args) .. " >> " .. shell_quote(log_path) .. " 2>&1"
     return parse_execute_result(os.execute(command))
+end
+
+function archive.run_shell(command, log_path)
+    log_path = harbor_log_file
+    return parse_execute_result(os.execute("mkdir -p /tmp/log; ( " .. tostring(command or "") .. " ) >> " .. shell_quote(log_path) .. " 2>&1"))
+end
+
+local function activate_nginx_web_server(log_path)
+    log_path = harbor_log_file
+    local command = table.concat({
+        "if [ -x /etc/init.d/uhttpd ]; then /etc/init.d/uhttpd disable; /etc/init.d/uhttpd stop; fi",
+        "/etc/init.d/uwsgi enable",
+        "/etc/init.d/uwsgi restart",
+        "/etc/init.d/nginx enable",
+        "/etc/init.d/nginx restart"
+    }, "; ")
+    return parse_execute_result(os.execute(
+        "mkdir -p /tmp/log; ( " .. command .. " ) >> " .. shell_quote(log_path) .. " 2>&1"
+    ))
 end
 
 local function hex32(value)
@@ -982,6 +1497,9 @@ end
 local function run_package_install_task(task)
     local nixio_fs = require "nixio.fs"
     local nixio = require "nixio"
+    if task.activate_nginx then
+        os.execute("sleep 2")
+    end
     local executable, args, cmd_err = build_package_install_command(task)
     if not executable then
         task.state = "failed"
@@ -994,7 +1512,7 @@ local function run_package_install_task(task)
         return
     end
 
-    nixio_fs.writefile(package_install_log_file, "")
+    hb_log(package_install_log_file, "==== Package install task start ====")
     hb_log(package_install_log_file, "Start " .. task.installer .. " install: " .. (task.package_name or task.path))
     task.state = "running"
     task.message = _("Checking package index")
@@ -1042,6 +1560,14 @@ local function run_package_install_task(task)
         warning_success = true
         success = true
         hb_log(package_install_log_file, "apk reported non-zero exit code but target package is installed; treating as success with warnings")
+    end
+    if success and task.activate_nginx then
+        local activate_exit_code = activate_nginx_web_server(package_install_log_file)
+        if activate_exit_code ~= 0 then
+            success = false
+            exit_code = activate_exit_code
+            hb_log(package_install_log_file, "Failed to activate nginx with code " .. tostring(activate_exit_code))
+        end
     end
     hb_log(package_install_log_file, success and "Install finished successfully" or ("Install failed with code " .. tostring(exit_code)))
 
@@ -1255,7 +1781,6 @@ local function run_thumbnail_task(task)
         local cache_path = stat and thumbnail_cache_path(item.path, stat, preferences) or nil
         if cache_path and nixio_fs.stat(cache_path) then
             task.cached_count = task.cached_count + 1
-            hb_log(thumbnail_task_log_file, "Cached: " .. item.name)
         elseif cache_path then
             local temp_path = cache_path .. ".tmp." .. task.task_id
             os.remove(temp_path)
@@ -1263,7 +1788,6 @@ local function run_thumbnail_task(task)
             local exit_code = run_logged_command(executable, args, thumbnail_task_log_file)
             if exit_code == 0 and nixio_fs.stat(temp_path) and os.rename(temp_path, cache_path) then
                 task.success_count = task.success_count + 1
-                hb_log(thumbnail_task_log_file, "Generated: " .. item.name)
             else
                 os.remove(temp_path)
                 task.failed_count = task.failed_count + 1
@@ -1376,25 +1900,44 @@ local function get_writable_directory(path)
     return normalized
 end
 
-local function get_directory_available_bytes(path)
+local function calculate_operation_space_margin(total_bytes)
+    local total = tonumber(total_bytes) or 0
+    if total <= 0 then
+        return 0
+    end
+    return math.ceil(total * operation_space_ratio)
+end
+
+local function get_directory_space_info(path)
     local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
     if not normalized then
-        return nil, "invalid directory"
+        return nil, nil, nil, "invalid directory"
     end
     local vfs = nixio_fs.statvfs(normalized)
     if not vfs then
-        return nil, "read filesystem space failed"
+        return nil, nil, nil, "read filesystem space failed"
     end
-    return (tonumber(vfs.bavail) or 0) * (tonumber(vfs.frsize) or 0)
+    local block_size = tonumber(vfs.frsize) or tonumber(vfs.bsize) or 0
+    local available = (tonumber(vfs.bavail) or 0) * block_size
+    local total = (tonumber(vfs.blocks) or 0) * block_size
+    return available, total, calculate_operation_space_margin(total)
+end
+
+local function get_directory_available_bytes(path)
+    local available, _, _, err = get_directory_space_info(path)
+    if not available then
+        return nil, err
+    end
+    return available
 end
 
 local function ensure_directory_space(path, required_bytes)
-    local available, err = get_directory_available_bytes(path)
+    local available, total, margin, err = get_directory_space_info(path)
     if not available then
         return false, 0, err
     end
-    local required = (tonumber(required_bytes) or 0) + operation_space_margin
+    local required = (tonumber(required_bytes) or 0) + (margin or 0)
     if available < required then
         return false, available, insufficient_space_message, required
     end
@@ -1514,6 +2057,24 @@ local function copy_tree(source, target)
     return true
 end
 
+local function cleanup_stale_uploads(dir)
+    local nixio_fs = require "nixio.fs"
+    local iterator = nixio_fs.dir(dir)
+    if not iterator then
+        return
+    end
+    local now = os.time()
+    for name in iterator do
+        if name:sub(1, 15) == ".harbor-upload-" then
+            local path = join_path(dir, name)
+            local stat = nixio_fs.stat(path)
+            if stat and stat.type == "reg" and now - (stat.mtime or 0) > 120 then
+                nixio_fs.unlink(path)
+            end
+        end
+    end
+end
+
 local function get_upload_directory(path)
     local nixio_fs = require "nixio.fs"
     local normalized = normalize_path(path)
@@ -1529,11 +2090,12 @@ local function get_upload_directory(path)
         return nil, nil, "target directory is not writable"
     end
 
-    local available, space_err = get_directory_available_bytes(normalized)
+    cleanup_stale_uploads(normalized)
+    local available, _, operation_space_margin, space_err = get_directory_space_info(normalized)
     if not available then
-        return nil, nil, space_err
+        return nil, nil, nil, space_err
     end
-    return normalized, available
+    return normalized, available, operation_space_margin or 0
 end
 
 local function parse_upload_names(value)
@@ -1722,10 +2284,67 @@ function api_navigation()
 end
 
 function api_preferences()
+    local preferences = read_preferences()
+    if harbor_debug_log then
+        preference_log("api_preferences start")
+        preference_log("base view_mode=" .. tostring(preferences.view_mode) ..
+            " home_dir=" .. tostring(preferences.home_dir) ..
+            " allow_system_operations=" .. tostring(preferences.allow_system_operations) ..
+            " show_hidden_files=" .. tostring(preferences.show_hidden_files) ..
+            " enable_thumbnails=" .. tostring(preferences.enable_thumbnails))
+    end
+    local nginx_preferences = read_nginx_preferences()
+    if harbor_debug_log then
+        preference_log("nginx template=" .. tostring(nginx_template_file) ..
+            " available=" .. tostring(nginx_preferences.nginx_config_available) ..
+            " uwsgi_request_buffering=" .. tostring(nginx_preferences.uwsgi_request_buffering) ..
+            " client_max_body_size=" .. tostring(nginx_preferences.client_max_body_size))
+    end
+    for key, value in pairs(nginx_preferences) do
+        preferences[key] = value
+    end
+    local uwsgi_preferences = read_uwsgi_preferences()
+    if harbor_debug_log then
+        preference_log("uwsgi config=" .. tostring(uwsgi_config_file) ..
+            " available=" .. tostring(uwsgi_preferences.uwsgi_config_available) ..
+            " reload-on-as=" .. tostring(uwsgi_preferences["reload-on-as"]) ..
+            " reload-on-as_enabled=" .. tostring(uwsgi_preferences["reload-on-as_enabled"]) ..
+            " reload-on-rss=" .. tostring(uwsgi_preferences["reload-on-rss"]) ..
+            " reload-on-rss_enabled=" .. tostring(uwsgi_preferences["reload-on-rss_enabled"]) ..
+            " post-buffering=" .. tostring(uwsgi_preferences["post-buffering"]) ..
+            " limit-as=" .. tostring(uwsgi_preferences["limit-as"]) ..
+            " reload-mercy=" .. tostring(uwsgi_preferences["reload-mercy"]) ..
+            " buffer-size=" .. tostring(uwsgi_preferences["buffer-size"]))
+    end
+    for key, value in pairs(uwsgi_preferences) do
+        preferences[key] = value
+    end
+    local uhttpd_preferences = read_uhttpd_preferences()
+    if harbor_debug_log then
+        preference_log("uhttpd config available=" .. tostring(uhttpd_preferences.uhttpd_config_available) ..
+            " script_timeout=" .. tostring(uhttpd_preferences.uhttpd_script_timeout) ..
+            " network_timeout=" .. tostring(uhttpd_preferences.uhttpd_network_timeout))
+    end
+    for key, value in pairs(uhttpd_preferences) do
+        preferences[key] = value
+    end
+    preferences.web_server = detect_web_server()
+    preferences.nginx_running = preferences.web_server == "nginx"
+    preferences.fcm = is_fanchmwrt_system()
+    if harbor_debug_log then
+        preference_log("detected web_server=" .. tostring(preferences.web_server) ..
+            " nginx_running=" .. tostring(preferences.nginx_running) ..
+            " fcm=" .. tostring(preferences.fcm))
+        preference_log("response nginx_config_available=" .. tostring(preferences.nginx_config_available) ..
+            " uwsgi_request_buffering=" .. tostring(preferences.uwsgi_request_buffering) ..
+            " client_max_body_size=" .. tostring(preferences.client_max_body_size) ..
+            " uwsgi_config_available=" .. tostring(preferences.uwsgi_config_available) ..
+            " uhttpd_config_available=" .. tostring(preferences.uhttpd_config_available))
+    end
     write_json({
         code = 0,
         message = "success",
-        data = read_preferences()
+        data = preferences
     })
 end
 
@@ -1743,44 +2362,193 @@ function api_save_preferences()
         return
     end
 
+    local section = luci.http.formvalue("section") or "basic"
+    local current = read_preferences()
+    local web_server = detect_web_server()
+
+    if section == "nginx" then
+        section = "web_server"
+    end
+
+    if section == "web_server" then
+        if web_server == "uhttpd" then
+            local current_uhttpd_preferences = read_uhttpd_preferences()
+            local uhttpd_preferences = read_uhttpd_form_preferences(current_uhttpd_preferences)
+            local uhttpd_ok, uhttpd_saved, uhttpd_err = pcall(save_uhttpd_configuration, uhttpd_preferences)
+            if not uhttpd_ok then
+                uhttpd_err = tostring(uhttpd_saved)
+                uhttpd_saved = nil
+            end
+            if not uhttpd_saved then
+                write_json({
+                    code = 1,
+                    message = uhttpd_err or _("Failed to update uHTTPd configuration")
+                })
+                return
+            end
+
+            local preferences = read_preferences()
+            local nginx_preferences = read_nginx_preferences()
+            for key, value in pairs(nginx_preferences) do
+                preferences[key] = value
+            end
+            local uwsgi_preferences = read_uwsgi_preferences()
+            for key, value in pairs(uwsgi_preferences) do
+                preferences[key] = value
+            end
+            local saved_uhttpd_preferences = read_uhttpd_preferences()
+            for key, value in pairs(saved_uhttpd_preferences) do
+                preferences[key] = value
+            end
+            preferences.web_server = web_server
+            preferences.nginx_running = false
+            preferences.fcm = is_fanchmwrt_system()
+            write_json({
+                code = 0,
+                message = "success",
+                data = preferences
+            })
+            return
+        end
+
+        if web_server ~= "nginx" then
+            write_json_status(400, "Web Service Not Supported", {
+                code = 1,
+                message = _("Web service is not supported")
+            })
+            return
+        end
+
+        local current_nginx_preferences = read_nginx_preferences()
+        local nginx_preferences = read_nginx_form_preferences(current_nginx_preferences)
+        local current_uwsgi_preferences = read_uwsgi_preferences()
+        local uwsgi_preferences = read_uwsgi_form_preferences(current_uwsgi_preferences)
+
+        if not current_nginx_preferences.nginx_config_available then
+            write_json({
+                code = 1,
+                message = _("Nginx configuration template was not found")
+            })
+            return
+        end
+        if not current_uwsgi_preferences.uwsgi_config_available then
+            write_json({
+                code = 1,
+                message = _("uWSGI configuration file was not found")
+            })
+            return
+        end
+
+        local ok, applied, apply_err = pcall(save_nginx_configuration, nginx_preferences)
+        if not ok then
+            apply_err = tostring(applied)
+            applied = nil
+        end
+        if not applied then
+            write_json({
+                code = 1,
+                message = apply_err or _("Failed to update Nginx configuration")
+            })
+            return
+        end
+
+        local uwsgi_ok, uwsgi_saved, uwsgi_err = pcall(save_uwsgi_configuration, uwsgi_preferences)
+        if not uwsgi_ok then
+            uwsgi_err = tostring(uwsgi_saved)
+            uwsgi_saved = nil
+        end
+        if not uwsgi_saved then
+            write_json({
+                code = 1,
+                message = uwsgi_err or _("Failed to update uWSGI configuration")
+            })
+            return
+        end
+
+        local preferences = read_preferences()
+        local saved_nginx_preferences = read_nginx_preferences()
+        for key, value in pairs(saved_nginx_preferences) do
+            preferences[key] = value
+        end
+        local saved_uwsgi_preferences = read_uwsgi_preferences()
+        for key, value in pairs(saved_uwsgi_preferences) do
+            preferences[key] = value
+        end
+        local uhttpd_preferences = read_uhttpd_preferences()
+        for key, value in pairs(uhttpd_preferences) do
+            preferences[key] = value
+        end
+        preferences.web_server = web_server
+        preferences.nginx_running = true
+        preferences.fcm = is_fanchmwrt_system()
+        write_json({
+            code = 0,
+            message = "success",
+            data = preferences
+        })
+        return
+    end
+
+    if section ~= "basic" then
+        write_json_status(400, "Invalid Section", { code = 1, message = "invalid section" })
+        return
+    end
+
     local view_mode = normalize_preference_number(
         luci.http.formvalue("view_mode"),
-        preference_defaults.view_mode,
+        current.view_mode,
         valid_view_mode_values
     )
     local allow_system_operations = normalize_preference_number(
         luci.http.formvalue("allow_system_operations"),
-        preference_defaults.allow_system_operations,
+        current.allow_system_operations,
         valid_boolean_values
     )
     local show_hidden_files = normalize_preference_number(
         luci.http.formvalue("show_hidden_files"),
-        preference_defaults.show_hidden_files,
+        current.show_hidden_files,
         valid_boolean_values
     )
     local enable_thumbnails = normalize_preference_number(
         luci.http.formvalue("enable_thumbnails"),
-        preference_defaults.enable_thumbnails,
+        current.enable_thumbnails,
         valid_boolean_values
     )
-    local home_dir = normalize_home_dir(luci.http.formvalue("home_dir"))
+    local home_dir = normalize_home_dir(luci.http.formvalue("home_dir") or current.home_dir)
 
-    if not save_preferences(view_mode, allow_system_operations, show_hidden_files, home_dir, enable_thumbnails) then
+    if not save_basic_preferences(
+        view_mode,
+        allow_system_operations,
+        show_hidden_files,
+        home_dir,
+        enable_thumbnails
+    ) then
         write_json_status(500, "Save Failed", { code = 1, message = "save preferences failed" })
         return
     end
     build_quick_access({ home_dir = home_dir })
 
+    local preferences = read_preferences()
+    local nginx_preferences = read_nginx_preferences()
+    for key, value in pairs(nginx_preferences) do
+        preferences[key] = value
+    end
+    local uwsgi_preferences = read_uwsgi_preferences()
+    for key, value in pairs(uwsgi_preferences) do
+        preferences[key] = value
+    end
+    local uhttpd_preferences = read_uhttpd_preferences()
+    for key, value in pairs(uhttpd_preferences) do
+        preferences[key] = value
+    end
+    preferences.web_server = web_server
+    preferences.nginx_running = web_server == "nginx"
+    preferences.fcm = is_fanchmwrt_system()
+
     write_json({
         code = 0,
         message = "success",
-        data = {
-            view_mode = view_mode,
-            allow_system_operations = allow_system_operations,
-            show_hidden_files = show_hidden_files,
-            home_dir = home_dir,
-            enable_thumbnails = enable_thumbnails
-        }
+        data = preferences
     })
 end
 
@@ -1797,7 +2565,11 @@ function api_list()
         write_json({ code = 2, message = err or "list failed" })
         return
     end
-    local available = get_directory_available_bytes(path) or 0
+    local available, total, operation_space_margin = get_directory_space_info(path)
+    local has_operation_space = available ~= nil and available >= (operation_space_margin or 0)
+    available = available or 0
+    total = total or 0
+    operation_space_margin = operation_space_margin or 0
 
     write_json({
         code = 0,
@@ -1806,8 +2578,9 @@ function api_list()
             path = path,
             parent = parent_path(path),
             available_bytes = available,
+            total_bytes = total,
             operation_space_margin = operation_space_margin,
-            has_operation_space = available >= operation_space_margin,
+            has_operation_space = has_operation_space,
             items = items
         }
     })
@@ -1832,7 +2605,7 @@ function api_create_directory()
         write_json_status(507, "Insufficient Storage", {
             code = 2,
             message = space_err or insufficient_space_message,
-            data = { available_bytes = available, required_bytes = operation_space_margin }
+            data = { available_bytes = available, required_bytes = 0 }
         })
         return
     end
@@ -1868,7 +2641,7 @@ function api_create_file()
         write_json_status(507, "Insufficient Storage", {
             code = 2,
             message = space_err or insufficient_space_message,
-            data = { available_bytes = available, required_bytes = operation_space_margin }
+            data = { available_bytes = available, required_bytes = 0 }
         })
         return
     end
@@ -1914,7 +2687,7 @@ function api_rename()
         write_json_status(507, "Insufficient Storage", {
             code = 2,
             message = space_err or insufficient_space_message,
-            data = { available_bytes = available, required_bytes = required or operation_space_margin }
+            data = { available_bytes = available, required_bytes = required or 0 }
         })
         return
     end
@@ -2017,7 +2790,7 @@ local function transfer_path(mode)
             write_json_status(507, "Insufficient Storage", {
                 code = 2,
                 message = space_err or insufficient_space_message,
-                data = { available_bytes = available, required_bytes = required or operation_space_margin }
+                data = { available_bytes = available, required_bytes = required or 0 }
             })
             return
         end
@@ -2160,7 +2933,7 @@ local function batch_transfer_path(mode)
         write_json_status(507, "Insufficient Storage", {
             code = 2,
             message = space_err or insufficient_space_message,
-            data = { available_bytes = available, required_bytes = required or (required_size + operation_space_margin) }
+            data = { available_bytes = available, required_bytes = required or required_size }
         })
         return
     end
@@ -2209,6 +2982,290 @@ local function batch_delete_paths()
     write_json({ code = 0, message = "success", data = { processed = #items, success_count = success_count } })
 end
 
+function archive.task_id()
+    return string.format("%s-%d", tostring(math.floor(video_now_ms() or 0)), math.floor(os.time() % 100000))
+end
+
+function archive.read_state()
+    local state = read_json_file(archive.state_file)
+    if not state then
+        return nil
+    end
+    if (state.state == "pending" or state.state == "running") and not task_process_running(state.pid) then
+        state.state = "failed"
+        state.done = true
+        state.success = false
+        state.message = _("Archive task ended unexpectedly")
+        state.finished_at = state.finished_at or current_timestamp()
+        state.exit_code = state.exit_code or -1
+        write_json_file(archive.state_file, state)
+    end
+    return state
+end
+
+function archive.write_state(state)
+    return write_json_file(archive.state_file, state)
+end
+
+function archive.response(state)
+    return {
+        task_id = state.task_id,
+        state = state.state,
+        mode = state.mode,
+        done = state.done == true,
+        success = state.success == true,
+        message = state.message or "",
+        exit_code = state.exit_code,
+        format = state.format,
+        path = state.path,
+        output_path = state.output_path,
+        destination_path = state.destination_path,
+        source_count = state.source_count,
+        started_at = state.started_at,
+        finished_at = state.finished_at,
+        log = read_log_file(archive.log_file, archive.log_limit)
+    }
+end
+
+function archive.file_name(path)
+    return tostring(path or ""):match("([^/]+)$") or ""
+end
+
+function archive.detect_extract_format(path)
+    local name = archive.file_name(path):lower()
+    if name:match("%.tar%.gz$") then
+        return "tar.gz"
+    end
+    if name:match("%.tgz$") then
+        return "tgz"
+    end
+    if name:match("%.tar$") then
+        return "tar"
+    end
+    if name:match("%.zip$") then
+        return "zip"
+    end
+    if name:match("%.gz$") then
+        return "gz"
+    end
+    return nil
+end
+
+function archive.strip_suffix(name, format)
+    local lower = tostring(name or ""):lower()
+    local value = tostring(name or "")
+    local suffixes = {
+        ["tar.gz"] = ".tar.gz",
+        tgz = ".tgz",
+        tar = ".tar",
+        zip = ".zip",
+        gz = ".gz"
+    }
+    local suffix = suffixes[format]
+    if suffix and lower:sub(-#suffix) == suffix then
+        return value:sub(1, #value - #suffix)
+    end
+    return value
+end
+
+function archive.ensure_extension(name, format)
+    local info = archive.create_formats[format]
+    local output_name = tostring(name or "")
+    local lower = output_name:lower()
+    if info and info.extension and lower:sub(-#info.extension) ~= info.extension then
+        output_name = output_name .. info.extension
+    end
+    return output_name
+end
+
+function archive.source_size_estimate(path)
+    local nixio_fs = require "nixio.fs"
+    local stat = nixio_fs.lstat(path)
+    if not stat then
+        return 0
+    end
+    if stat.type == "reg" then
+        return tonumber(stat.size) or 0
+    end
+    if stat.type ~= "dir" then
+        return 0
+    end
+    local total = 0
+    local iterator = nixio_fs.dir(path)
+    if not iterator then
+        return total
+    end
+    for name in iterator do
+        total = total + archive.source_size_estimate(join_path(path, name))
+    end
+    return total
+end
+
+function archive.source_size(items)
+    local total = 0
+    for _, item in ipairs(items or {}) do
+        total = total + archive.source_size_estimate(item.path)
+    end
+    return total
+end
+
+function archive.create_command(task)
+    local format = archive.create_formats[task.format]
+    if not format then
+        return nil, _("Unsupported archive format")
+    end
+    local executable = find_executable(format.command)
+    if not executable then
+        return nil, _("Archive command not found")
+    end
+    if task.format == "tar.gz" then
+        local flag = "-czf"
+        local args = { flag, task.output_path, "-C", task.target_dir }
+        for _, name in ipairs(task.names or {}) do
+            table.insert(args, name)
+        end
+        return command_to_shell(executable, args)
+    end
+    return nil, _("Unsupported archive format")
+end
+
+function archive.extract_command(task)
+    local info = archive.extract_formats[task.format]
+    if not info then
+        return nil, _("Unsupported archive format")
+    end
+    local executable = find_executable(info.command)
+    if not executable then
+        return nil, _("Archive command not found")
+    end
+    if task.format == "zip" then
+        return command_to_shell(executable, { task.path, "-d", task.destination_path })
+    end
+    if task.format == "tar" or task.format == "tar.gz" or task.format == "tgz" then
+        local flag = "-xf"
+        if task.format == "tar.gz" or task.format == "tgz" then
+            flag = "-xzf"
+        end
+        return command_to_shell(executable, { flag, task.path, "-C", task.destination_path })
+    end
+    if task.format == "gz" then
+        return command_to_shell(executable, { "-dc", task.path }) .. " > " .. shell_quote(task.destination_path)
+    end
+    return nil, _("Unsupported archive format")
+end
+
+function archive.run_task(task)
+    local nixio = require "nixio"
+    local nixio_fs = require "nixio.fs"
+    task.state = "running"
+    task.pid = nixio.getpid()
+    task.message = task.mode == "create" and _("Creating archive") or _("Extracting archive")
+    archive.write_state(task)
+    hb_log(archive.log_file, task.message)
+
+    local command, command_err
+    if task.mode == "create" then
+        command, command_err = archive.create_command(task)
+    else
+        command, command_err = archive.extract_command(task)
+        if not command_err and task.container and not nixio_fs.mkdir(task.destination_path) then
+            command = nil
+            command_err = _("Create destination directory failed")
+        end
+    end
+
+    local exit_code = -1
+    if command then
+        exit_code = archive.run_shell(command, archive.log_file)
+    else
+        hb_log(archive.log_file, command_err or "archive command build failed")
+    end
+
+    local success = exit_code == 0
+    if not success and task.mode == "extract" and task.format == "zip" and exit_code == 1 then
+        success = true
+        hb_log(archive.log_file, "unzip finished with warnings; treating exit code 1 as success")
+    end
+    if not success then
+        if task.output_path then
+            nixio_fs.unlink(task.output_path)
+        end
+        if task.container and task.destination_path then
+            remove_tree(task.destination_path)
+        elseif task.mode == "extract" and task.destination_path then
+            nixio_fs.unlink(task.destination_path)
+        end
+    end
+    hb_log(archive.log_file, success and "Archive task finished successfully" or ("Archive task failed with code " .. tostring(exit_code)))
+
+    task.state = success and "success" or "failed"
+    task.done = true
+    task.success = success
+    task.exit_code = exit_code
+    task.message = success and (task.mode == "create" and _("Archive created successfully") or _("Archive extracted successfully")) or
+        (command_err or _("Archive operation failed"))
+    task.finished_at = current_timestamp()
+    archive.write_state(task)
+end
+
+function archive.start_task(task)
+    local nixio = require "nixio"
+    local pid = nixio.fork()
+    if not pid or pid < 0 then
+        return nil, "fork archive task failed"
+    end
+    if pid == 0 then
+        pcall(nixio.setsid)
+        local ok, err = pcall(archive.run_task, task)
+        if not ok then
+            task.state = "failed"
+            task.done = true
+            task.success = false
+            task.message = _("Archive operation failed")
+            task.exit_code = -1
+            task.finished_at = current_timestamp()
+            hb_log(archive.log_file, "archive runtime error: " .. tostring(err))
+            archive.write_state(task)
+        end
+        os.exit(0)
+    end
+    task.pid = pid
+    task.state = "running"
+    task.message = task.mode == "create" and _("Creating archive") or _("Extracting archive")
+    archive.write_state(task)
+    return pid
+end
+
+function archive.busy_response(current)
+    write_json_status(409, "Conflict", {
+        code = 1,
+        message = _("Another archive task is already running"),
+        data = archive.response(current)
+    })
+end
+
+function archive.start_response(task)
+    local nixio_fs = require "nixio.fs"
+    hb_log(archive.log_file, "==== Archive task start ====")
+    if not archive.write_state(task) then
+        write_json_status(500, "Archive Failed", { code = 1, message = _("Archive operation failed") })
+        return
+    end
+    local pid, start_err = archive.start_task(task)
+    if not pid then
+        task.state = "failed"
+        task.done = true
+        task.success = false
+        task.message = _("Archive operation failed")
+        task.exit_code = -1
+        task.finished_at = current_timestamp()
+        archive.write_state(task)
+        write_json_status(500, "Archive Failed", { code = 1, message = start_err or _("Archive operation failed") })
+        return
+    end
+    write_json({ code = 0, message = "success", data = archive.response(task) })
+end
+
 function api_copy()
     transfer_path("copy")
 end
@@ -2227,6 +3284,202 @@ end
 
 function api_batch_delete()
     batch_delete_paths()
+end
+
+function api_archive_create_start()
+    local nixio_fs = require "nixio.fs"
+    if not validate_write_request() then
+        return
+    end
+
+    local current = archive.read_state()
+    if current and (current.state == "pending" or current.state == "running") and not current.done then
+        archive.busy_response(current)
+        return
+    end
+
+    local paths, parse_err = parse_path_array_param("sources")
+    if not paths then
+        write_json_status(400, "Bad Request", { code = 1, message = parse_err })
+        return
+    end
+
+    local format_key = tostring(luci.http.formvalue("format") or ""):lower()
+    local format_info = archive.create_formats[format_key]
+    if not format_info then
+        write_json_status(400, "Bad Request", { code = 1, message = _("Unsupported archive format") })
+        return
+    end
+
+    local first_path = normalize_path(paths[1])
+    local target_dir = first_path and parent_path(first_path) or nil
+    target_dir = target_dir and select(1, get_writable_directory(target_dir)) or nil
+    if not target_dir then
+        write_json_status(400, "Bad Request", { code = 1, message = "invalid target directory" })
+        return
+    end
+    if not system_operations_allowed() and is_system_path(target_dir) then
+        return deny_system_operation()
+    end
+
+    local items, failed_path, err = validate_batch_sources(paths, "copy", target_dir)
+    if not items then
+        write_batch_failure(409, "Conflict", err, 0, 0, failed_path)
+        return
+    end
+    for _, item in ipairs(items) do
+        if parent_path(item.path) ~= target_dir then
+            write_json_status(409, "Conflict", { code = 1, message = _("Archive sources must be in the same directory") })
+            return
+        end
+    end
+    if format_info.single_file and (#items ~= 1 or items[1].stat.type ~= "reg") then
+        write_json_status(400, "Bad Request", { code = 1, message = _("This archive format only supports one regular file") })
+        return
+    end
+
+    local output_name = archive.ensure_extension(luci.http.formvalue("output_name"), format_key)
+    if not validate_upload_name(output_name) then
+        write_json_status(400, "Bad Request", { code = 1, message = "invalid file name" })
+        return
+    end
+    local output_path = join_path(target_dir, output_name)
+    if nixio_fs.lstat(output_path) then
+        write_json_status(409, "Conflict", { code = 1, message = "target already exists" })
+        return
+    end
+
+    local required_size = archive.source_size(items)
+    local has_space, available, space_err, required = ensure_directory_space(target_dir, required_size)
+    if not has_space then
+        write_json_status(507, "Insufficient Storage", {
+            code = 2,
+            message = space_err or insufficient_space_message,
+            data = { available_bytes = available, required_bytes = required or required_size }
+        })
+        return
+    end
+    if not find_executable(format_info.command) then
+        write_json_status(424, "Dependency Required", { code = 2, message = _("Archive command not found"), data = { missing_tool = format_info.command } })
+        return
+    end
+
+    local names = {}
+    local sources = {}
+    for _, item in ipairs(items) do
+        table.insert(names, item.name)
+        table.insert(sources, item.path)
+    end
+    local task = {
+        task_id = archive.task_id(),
+        mode = "create",
+        state = "pending",
+        done = false,
+        success = false,
+        message = _("Preparing archive"),
+        exit_code = nil,
+        format = format_key,
+        target_dir = target_dir,
+        output_path = output_path,
+        names = names,
+        sources = sources,
+        source_count = #sources,
+        started_at = current_timestamp(),
+        finished_at = nil,
+        pid = nil
+    }
+    archive.start_response(task)
+end
+
+function api_archive_extract_start()
+    local nixio_fs = require "nixio.fs"
+    if not validate_write_request() then
+        return
+    end
+
+    local current = archive.read_state()
+    if current and (current.state == "pending" or current.state == "running") and not current.done then
+        archive.busy_response(current)
+        return
+    end
+
+    local path = normalize_path(luci.http.formvalue("path"))
+    local stat = path and path ~= "/" and nixio_fs.lstat(path) or nil
+    local format_key = path and archive.detect_extract_format(path) or nil
+    local format_info = format_key and archive.extract_formats[format_key] or nil
+    if not path or not stat or stat.type ~= "reg" or not format_info then
+        write_json_status(400, "Bad Request", { code = 1, message = _("Unsupported archive format") })
+        return
+    end
+
+    local target_dir, parent_err = get_writable_directory(parent_path(path))
+    if not target_dir then
+        write_json_status(403, "Forbidden", { code = 1, message = parent_err or "directory is not writable" })
+        return
+    end
+    if not system_operations_allowed() and is_system_path(target_dir) then
+        return deny_system_operation()
+    end
+
+    local base_name = archive.file_name(path)
+    local destination_name = archive.strip_suffix(base_name, format_key)
+    if not destination_name or destination_name == "" or destination_name == "." then
+        destination_name = "archive_extract"
+    end
+    local destination_path = join_path(target_dir, destination_name)
+    if nixio_fs.lstat(destination_path) then
+        write_json_status(409, "Conflict", { code = 1, message = "target already exists" })
+        return
+    end
+
+    local has_space, available, space_err, required = ensure_directory_space(target_dir, 0)
+    if not has_space then
+        write_json_status(507, "Insufficient Storage", {
+            code = 2,
+            message = space_err or insufficient_space_message,
+            data = { available_bytes = available, required_bytes = required or 0 }
+        })
+        return
+    end
+    if not find_executable(format_info.command) then
+        write_json_status(424, "Dependency Required", { code = 2, message = _("Archive command not found"), data = { missing_tool = format_info.command } })
+        return
+    end
+
+    local task = {
+        task_id = archive.task_id(),
+        mode = "extract",
+        state = "pending",
+        done = false,
+        success = false,
+        message = _("Preparing archive"),
+        exit_code = nil,
+        format = format_key,
+        path = path,
+        destination_path = destination_path,
+        container = format_info.container == true,
+        source_count = 1,
+        started_at = current_timestamp(),
+        finished_at = nil,
+        pid = nil
+    }
+    archive.start_response(task)
+end
+
+function api_archive_status()
+    local task_id = luci.http.formvalue("task_id")
+    if type(task_id) ~= "string" or task_id == "" then
+        write_json_status(400, "Bad Request", { code = 1, message = _("Invalid task id") })
+        return
+    end
+
+    local task = archive.read_state()
+    if not task or task.task_id ~= task_id then
+        write_json_status(404, "Not Found", { code = 1, message = _("Archive task not found") })
+        return
+    end
+
+    write_json({ code = 0, message = "success", data = archive.response(task) })
 end
 
 function api_package_install_start()
@@ -2262,7 +3515,7 @@ function api_package_install_start()
     end
 
     local task = create_package_install_task(path, package_type)
-    nixio_fs.writefile(package_install_log_file, "")
+    hb_log(package_install_log_file, "==== Package install request ====")
     if not write_package_install_state(task) then
         write_json_status(500, "Install Failed", { code = 1, message = _("Package installation failed") })
         return
@@ -2302,6 +3555,79 @@ function api_package_install_status()
         return
     end
 
+    write_json({
+        code = 0,
+        message = "success",
+        data = build_package_install_response(task)
+    })
+end
+
+function api_nginx_install_start()
+    local nixio_fs = require "nixio.fs"
+    if not validate_write_request() then
+        return
+    end
+
+    if detect_web_server() == "nginx" then
+        write_json({
+            code = 0,
+            message = "success",
+            data = {
+                done = true,
+                success = true,
+                web_server = "nginx"
+            }
+        })
+        return
+    end
+
+    local current = read_package_install_state()
+    if current and (current.state == "pending" or current.state == "running") and not current.done then
+        write_json_status(409, "Conflict", {
+            code = 1,
+            message = _("Another package installation is already running"),
+            data = build_package_install_response(current)
+        })
+        return
+    end
+
+    local installer = detect_nginx_installer()
+    if not installer then
+        write_json_status(500, "Install Failed", {
+            code = 1,
+            message = _("Installer command not found")
+        })
+        return
+    end
+
+    local task = create_repository_install_task(nginx_package_name, installer)
+    task.activate_nginx = true
+    hb_log(package_install_log_file, "==== Nginx install request ====")
+    if not write_package_install_state(task) then
+        write_json_status(500, "Install Failed", {
+            code = 1,
+            message = _("Package installation failed")
+        })
+        return
+    end
+
+    local pid, start_err = start_package_install_task(task)
+    if not pid then
+        task.state = "failed"
+        task.done = true
+        task.success = false
+        task.message = _("Package installation failed")
+        task.exit_code = -1
+        task.finished_at = current_timestamp()
+        write_package_install_state(task)
+        write_json_status(500, "Install Failed", {
+            code = 1,
+            message = start_err or _("Package installation failed")
+        })
+        return
+    end
+
+    task.pid = pid
     write_json({
         code = 0,
         message = "success",
@@ -2389,7 +3715,7 @@ function api_thumbnail_generate_start()
     end
 
     local task = create_thumbnail_task(path, preferences, #images)
-    nixio_fs.writefile(thumbnail_task_log_file, "")
+    hb_log(thumbnail_task_log_file, "==== Thumbnail task start ====")
     if not write_thumbnail_task_state(task) then
         write_json_status(500, "Thumbnail Failed", { code = 1, message = _("Thumbnail generation failed") })
         return
@@ -2425,7 +3751,7 @@ function api_thumbnail_tool_install_start()
         task.message = _("GraphicsMagick is already installed")
         task.exit_code = 0
         task.finished_at = current_timestamp()
-        nixio_fs.writefile(package_install_log_file, "GraphicsMagick is already installed\n")
+        hb_log(package_install_log_file, "GraphicsMagick is already installed")
         write_package_install_state(task)
         write_json({ code = 0, message = "success", data = build_package_install_response(task) })
         return
@@ -2448,7 +3774,70 @@ function api_thumbnail_tool_install_start()
     end
 
     local task = create_repository_install_task("graphicsmagick", installer)
-    nixio_fs.writefile(package_install_log_file, "")
+    hb_log(package_install_log_file, "==== GraphicsMagick install request ====")
+    if not write_package_install_state(task) then
+        write_json_status(500, "Install Failed", { code = 1, message = _("Package installation failed") })
+        return
+    end
+
+    local pid, start_err = start_package_install_task(task)
+    if not pid then
+        task.state = "failed"
+        task.done = true
+        task.success = false
+        task.message = _("Package installation failed")
+        task.exit_code = -1
+        task.finished_at = current_timestamp()
+        write_package_install_state(task)
+        write_json_status(500, "Install Failed", { code = 1, message = start_err or _("Package installation failed") })
+        return
+    end
+
+    write_json({
+        code = 0,
+        message = "success",
+        data = build_package_install_response(task)
+    })
+end
+
+function api_terminal_tool_install_start()
+    local nixio_fs = require "nixio.fs"
+    if not validate_write_request() then
+        return
+    end
+
+    if find_executable("ttyd") then
+        local task = create_repository_install_task(terminal_package_name, detect_package_installer() or "")
+        task.state = "success"
+        task.done = true
+        task.success = true
+        task.message = _("ttyd is already installed")
+        task.exit_code = 0
+        task.finished_at = current_timestamp()
+        hb_log(package_install_log_file, "ttyd is already installed")
+        write_package_install_state(task)
+        write_json({ code = 0, message = "success", data = build_package_install_response(task) })
+        return
+    end
+
+    local current = read_package_install_state()
+    if current and (current.state == "pending" or current.state == "running") and not current.done then
+        write_json_status(409, "Conflict", {
+            code = 1,
+            message = _("Another package installation is already running"),
+            data = build_package_install_response(current)
+        })
+        return
+    end
+
+    local installer = detect_package_installer()
+    if not installer then
+        write_json_status(500, "Install Failed", { code = 1, message = _("Installer command not found") })
+        return
+    end
+
+    local task = create_repository_install_task(terminal_package_name, installer)
+    hb_log(package_install_log_file, "==== ttyd install request ====")
     if not write_package_install_state(task) then
         write_json_status(500, "Install Failed", { code = 1, message = _("Package installation failed") })
         return
@@ -2783,7 +4172,7 @@ function api_save_text()
         write_json_status(507, "Insufficient Storage", {
             code = 2,
             message = space_err or insufficient_space_message,
-            data = { available_bytes = available, required_bytes = required or operation_space_margin }
+            data = { available_bytes = available, required_bytes = required or 0 }
         })
         return
     end
@@ -2808,18 +4197,14 @@ end
 
 function api_image()
     local path = normalize_path(luci.http.formvalue("path"))
-    local request_id = "image-" .. tostring(math.floor(video_now_ms() or 0))
-    hb_log(video_log_file, request_id .. " begin raw_path=" .. clean_log_value(luci.http.formvalue("path")) .. " path=" .. clean_log_value(path))
     local stat, err = validate_preview_file(path, "image")
     if not stat then
-        hb_log(video_log_file, request_id .. " reject path=" .. clean_log_value(path) .. " error=" .. clean_log_value(err))
         write_plain_status(400, "Bad Request", err)
         return
     end
 
     local fd = io.open(path, "rb")
     if not fd then
-        hb_log(video_log_file, request_id .. " open_failed path=" .. clean_log_value(path))
         write_plain_status(500, "Internal Server Error", "open file failed")
         return
     end
@@ -2831,20 +4216,15 @@ function api_image()
     luci.http.header("Cache-Control", "no-store")
     luci.http.header("Content-Disposition", "inline")
     luci.http.prepare_content(mime)
-    hb_log(video_log_file, request_id .. " response path=" .. clean_log_value(path) .. " size=" .. tostring(stat.size or 0) .. " mime=" .. mime)
 
-    local sent = 0
-    local write_error = ""
     while true do
         local data = fd:read(65536)
         if not data or #data == 0 then
             break
         end
         luci.http.write(data)
-        sent = sent + #data
     end
     fd:close()
-    hb_log(video_log_file, request_id .. " done path=" .. clean_log_value(path) .. " sent=" .. tostring(sent) .. " error=" .. clean_log_value(write_error))
 end
 
 function api_thumbnail()
@@ -2979,6 +4359,8 @@ local function get_request_range()
     return "", "none", table.concat(candidates, " ")
 end
 
+local video_range_window = 16 * 1024 * 1024
+
 local function build_video_range(file_size, range_value)
     if range_value == "" then
         return 0, file_size - 1, false
@@ -2988,36 +4370,303 @@ local function build_video_range(file_size, range_value)
     if start_pos == nil then
         return nil, nil, nil
     end
+    if end_pos - start_pos + 1 > video_range_window then
+        end_pos = start_pos + video_range_window - 1
+    end
     return start_pos, end_pos, true
 end
 
-local function stream_file(fd, content_length)
-    local remain = content_length
+local function ru32(data, pos)
+    local a, b, c, d = data:byte(pos, pos + 3)
+    return ((a * 256 + b) * 256 + c) * 256 + d
+end
+
+local function ru64(data, pos)
+    return ru32(data, pos) * 4294967296 + ru32(data, pos + 4)
+end
+
+local function be32(value)
+    local b4 = value % 256
+    value = (value - b4) / 256
+    local b3 = value % 256
+    value = (value - b3) / 256
+    local b2 = value % 256
+    value = (value - b2) / 256
+    return string.char(value % 256, b2, b3, b4)
+end
+
+local function be64(value)
+    return be32(math.floor(value / 4294967296)) .. be32(value % 4294967296)
+end
+
+local mp4_container_boxes = { trak = true, mdia = true, minf = true, stbl = true }
+
+local function patch_moov_offsets(moov_data, shift)
+    local patches = {}
+    local codecs = {}
+    local total_entries = 0
+    local function walk(pos, limit)
+        while pos + 7 <= limit do
+            local size = ru32(moov_data, pos)
+            local btype = moov_data:sub(pos + 4, pos + 7)
+            local hlen = 8
+            if size == 1 then
+                if pos + 15 > limit then
+                    return false
+                end
+                size = ru64(moov_data, pos + 8)
+                hlen = 16
+            elseif size == 0 then
+                size = limit - pos + 1
+            end
+            if size < hlen or pos + size - 1 > limit then
+                return false
+            end
+            if btype == "cmov" then
+                return false
+            end
+            if btype == "stco" or btype == "co64" then
+                local width = btype == "stco" and 4 or 8
+                local count_pos = pos + hlen + 4
+                if count_pos + 3 > limit then
+                    return false
+                end
+                local count = ru32(moov_data, count_pos)
+                local entry_pos = count_pos + 4
+                if entry_pos + count * width - 1 > pos + size - 1 then
+                    return false
+                end
+                total_entries = total_entries + count
+                if total_entries > 1048576 then
+                    return false
+                end
+                local out = {}
+                for i = 0, count - 1 do
+                    local p = entry_pos + i * width
+                    local value = (width == 4 and ru32(moov_data, p) or ru64(moov_data, p)) + shift
+                    if width == 4 and value >= 4294967296 then
+                        return false
+                    end
+                    out[i + 1] = width == 4 and be32(value) or be64(value)
+                end
+                table.insert(patches, { pos = entry_pos, len = count * width, data = table.concat(out) })
+            elseif btype == "stsd" then
+                if pos + hlen + 15 <= limit then
+                    local fourcc = moov_data:sub(pos + hlen + 12, pos + hlen + 15):gsub("[^%w]", "?")
+                    table.insert(codecs, fourcc)
+                end
+            elseif mp4_container_boxes[btype] then
+                if not walk(pos + hlen, pos + size - 1) then
+                    return false
+                end
+            end
+            pos = pos + size
+        end
+        return true
+    end
+    local root_hlen = ru32(moov_data, 1) == 1 and 16 or 8
+    if not walk(1 + root_hlen, #moov_data) or #patches == 0 then
+        return nil, table.concat(codecs, ",")
+    end
+    table.sort(patches, function(a, b) return a.pos < b.pos end)
+    local pieces = {}
+    local last = 1
+    for _, patch in ipairs(patches) do
+        table.insert(pieces, moov_data:sub(last, patch.pos - 1))
+        table.insert(pieces, patch.data)
+        last = patch.pos + patch.len
+    end
+    table.insert(pieces, moov_data:sub(last))
+    return table.concat(pieces), table.concat(codecs, ",")
+end
+
+local function build_faststart_plan(path, file_size)
+    local ext = get_ext(path)
+    if ext ~= "mp4" and ext ~= "m4v" and ext ~= "mov" then
+        return nil, "skip ext=" .. tostring(ext)
+    end
+    local fd = io.open(path, "rb")
+    if not fd then
+        return nil, "skip open_failed"
+    end
+    local boxes = {}
+    local offset = 0
+    while offset + 8 <= file_size and #boxes < 32 do
+        fd:seek("set", offset)
+        local header = fd:read(8)
+        if not header or #header < 8 then
+            break
+        end
+        local size = ru32(header, 1)
+        local btype = header:sub(5, 8)
+        local hlen = 8
+        if size == 1 then
+            local ext8 = fd:read(8)
+            if not ext8 or #ext8 < 8 then
+                break
+            end
+            size = ru64(ext8, 1)
+            hlen = 16
+        elseif size == 0 then
+            size = file_size - offset
+        end
+        if size < hlen then
+            break
+        end
+        table.insert(boxes, { type = btype, offset = offset, size = size })
+        offset = offset + size
+    end
+    local mdat_off, moov
+    for _, box in ipairs(boxes) do
+        if box.type == "mdat" and not mdat_off then
+            mdat_off = box.offset
+        end
+        if box.type == "moov" and not moov then
+            moov = box
+        end
+    end
+    if not moov or not mdat_off or moov.offset < mdat_off then
+        fd:close()
+        return nil, "skip layout_ok"
+    end
+    if moov.size > 16 * 1024 * 1024 then
+        fd:close()
+        return nil, "skip moov_too_large size=" .. tostring(moov.size)
+    end
+    fd:seek("set", moov.offset)
+    local moov_data = fd:read(moov.size)
+    fd:close()
+    if not moov_data or #moov_data ~= moov.size then
+        return nil, "skip moov_read_failed"
+    end
+    local patched, codecs = patch_moov_offsets(moov_data, moov.size)
+    if not patched then
+        return nil, "skip patch_failed codecs=" .. tostring(codecs)
+    end
+    local segments = {
+        { offset = 0, length = mdat_off },
+        { data = patched },
+        { offset = mdat_off, length = moov.offset - mdat_off }
+    }
+    local tail_start = moov.offset + moov.size
+    if tail_start < file_size then
+        table.insert(segments, { offset = tail_start, length = file_size - tail_start })
+    end
+    return segments, "applied moov_size=" .. tostring(moov.size) .. " mdat_off=" .. tostring(mdat_off) ..
+        " codecs=" .. tostring(codecs)
+end
+
+local function stream_segments(path, segments, start_pos, total_length)
+    local nixio = require "nixio"
+    local fd = io.open(path, "rb")
+    if not fd then
+        return 0, nil, "open file failed", 0
+    end
+    local remain = total_length
+    local skip = start_pos
     local sent = 0
     local first_write_ms
-    while remain > 0 do
-        local block_size = math.min(remain, 65536)
-        local data = fd:read(block_size)
-        if not data or #data == 0 then
-            return sent, first_write_ms, "unexpected end of file"
-        end
+    local mem_floor_kb = 100 * 1024
+    local check_step = 4 * 1024 * 1024
+    local next_check = check_step
+    local waited_ms = 0
+
+    local function push(data)
         luci.http.write(data)
         if not first_write_ms then
             first_write_ms = video_now_ms()
         end
         sent = sent + #data
         remain = remain - #data
+        if sent >= next_check then
+            next_check = sent + check_step
+            local mem_kb = get_available_memory_kb()
+            if mem_kb and mem_kb < mem_floor_kb then
+                local wait_start = video_now_ms()
+                while mem_kb and mem_kb < mem_floor_kb do
+                    nixio.nanosleep(0, 200 * 1000000)
+                    if video_now_ms() - wait_start > 60000 then
+                        return "low memory timeout mem_kb=" .. tostring(mem_kb)
+                    end
+                    mem_kb = get_available_memory_kb()
+                end
+                waited_ms = waited_ms + (video_now_ms() - wait_start)
+            end
+        end
+        return nil
     end
-    return sent, first_write_ms
+
+    for _, seg in ipairs(segments) do
+        if remain <= 0 then
+            break
+        end
+        local seg_len = seg.data and #seg.data or seg.length
+        if skip >= seg_len then
+            skip = skip - seg_len
+        elseif seg.data then
+            local piece = seg.data:sub(skip + 1, skip + math.min(remain, seg_len - skip))
+            skip = 0
+            local err = push(piece)
+            if err then
+                fd:close()
+                return sent, first_write_ms, err, waited_ms
+            end
+        else
+            if not fd:seek("set", seg.offset + skip) then
+                fd:close()
+                return sent, first_write_ms, "seek file failed", waited_ms
+            end
+            local seg_remain = math.min(seg_len - skip, remain)
+            skip = 0
+            while seg_remain > 0 do
+                local data = fd:read(math.min(seg_remain, 65536))
+                if not data or #data == 0 then
+                    fd:close()
+                    return sent, first_write_ms, "unexpected end of file", waited_ms
+                end
+                seg_remain = seg_remain - #data
+                local err = push(data)
+                if err then
+                    fd:close()
+                    return sent, first_write_ms, err, waited_ms
+                end
+            end
+        end
+    end
+    fd:close()
+    if remain > 0 then
+        return sent, first_write_ms, "unexpected end of file", waited_ms
+    end
+    return sent, first_write_ms, nil, waited_ms
 end
 
-function api_video()
-    local request_started = video_now_ms()
-    local request_id = tostring(os.time()) .. "-" .. tostring({}):gsub("[^%w]", ""):sub(-8)
+function api_video_check()
     local path = normalize_path(luci.http.formvalue("path"))
     local stat, err = validate_preview_file(path, "video")
     if not stat then
-        hb_log(video_log_file, request_id .. " reject path=" .. clean_log_value(path) .. " error=" .. clean_log_value(err))
+        write_json_status(400, "Bad Request", { code = 1, message = err or "invalid file" })
+        return
+    end
+    local file_size = stat.size or 0
+    local range_value = get_request_range()
+    local range_supported = range_value ~= ""
+    local tmp_available = get_directory_available_bytes("/tmp") or 0
+    write_json({
+        code = 0,
+        message = "success",
+        data = {
+            range_supported = range_supported,
+            tmp_available = tmp_available,
+            file_size = file_size,
+            playable = range_supported or tmp_available >= file_size
+        }
+    })
+end
+
+function api_video()
+    local path = normalize_path(luci.http.formvalue("path"))
+    local stat, err = validate_preview_file(path, "video")
+    if not stat then
         write_plain_status(400, "Bad Request", err)
         return
     end
@@ -3028,12 +4677,17 @@ function api_video()
         return
     end
 
-    local range_value, range_source, range_candidates = get_request_range()
-    hb_log(video_log_file, request_id .. " begin method=" .. clean_log_value(luci.http.getenv("REQUEST_METHOD")) ..
-        " path=" .. clean_log_value(path) .. " size=" .. tostring(file_size) ..
-        " range_source=" .. range_source .. " range=" .. clean_log_value(range_value) ..
-        " candidates=" .. range_candidates)
-    hb_log(video_log_file, request_id .. " " .. describe_http_environment())
+    local range_value, range_source = get_request_range()
+    if range_value == "" then
+        local tmp_available = get_directory_available_bytes("/tmp") or 0
+        if tmp_available < file_size then
+            write_json_status(507, "Insufficient Storage", {
+                code = 2,
+                message = _("Web server does not support Range requests and available memory is too small to play this video")
+            })
+            return
+        end
+    end
     local start_pos, end_pos, partial = build_video_range(file_size, range_value)
     luci.http.header("X-FS-Range-Source", range_source)
     if start_pos == nil then
@@ -3046,16 +4700,10 @@ function api_video()
 
     local fd = io.open(path, "rb")
     if not fd then
-        hb_log(video_log_file, request_id .. " open_failed elapsed_ms=" .. tostring(video_now_ms() - request_started))
         write_plain_status(500, "Internal Server Error", "open file failed")
         return
     end
-    if not fd:seek("set", start_pos) then
-        fd:close()
-        hb_log(video_log_file, request_id .. " seek_failed start=" .. tostring(start_pos))
-        write_plain_status(500, "Internal Server Error", "seek file failed")
-        return
-    end
+    fd:close()
 
     local content_length = end_pos - start_pos + 1
     set_status(partial and 206 or 200, partial and "Partial Content" or "OK")
@@ -3067,28 +4715,20 @@ function api_video()
     luci.http.header("Content-Length", tostring(content_length))
     luci.http.header("Cache-Control", "private, max-age=60")
     luci.http.prepare_content(video_mime_map[get_ext(path)])
-    hb_log(video_log_file, request_id .. " response status=" .. (partial and "206" or "200") ..
-        " start=" .. tostring(start_pos) .. " end=" .. tostring(end_pos) ..
-        " length=" .. tostring(content_length) .. " header_ms=" .. tostring(video_now_ms() - request_started))
 
     if luci.http.getenv("REQUEST_METHOD") ~= "HEAD" then
-        local sent, first_write_ms, stream_err = stream_file(fd, content_length)
-        hb_log(video_log_file, request_id .. " stream_done sent=" .. tostring(sent) ..
-            " first_write_ms=" .. tostring(first_write_ms and first_write_ms - request_started or -1) ..
-            " total_ms=" .. tostring(video_now_ms() - request_started) ..
-            " error=" .. clean_log_value(stream_err))
+        local segments
+        if range_value == "" then
+            local plan_ok, plan_segments = pcall(build_faststart_plan, path, file_size)
+            if plan_ok then
+                segments = plan_segments
+            end
+        end
+        if not segments then
+            segments = { { offset = 0, length = file_size } }
+        end
+        stream_segments(path, segments, start_pos, content_length)
     end
-    fd:close()
-end
-
-function api_video_log()
-    local nixio_fs = require "nixio.fs"
-    local content = nixio_fs.readfile(video_log_file) or ""
-    if #content > 65536 then
-        content = content:sub(#content - 65535)
-    end
-    luci.http.header("Cache-Control", "no-store")
-    write_json({ code = 0, message = "success", data = { content = content } })
 end
 
 local function find_upload_conflicts(target_dir, names)
@@ -3121,7 +4761,7 @@ function api_upload_check()
         return
     end
 
-    local target_dir, available, dir_err = get_upload_directory(luci.http.formvalue("target_dir"))
+    local target_dir, available, upload_safety_margin, dir_err = get_upload_directory(luci.http.formvalue("target_dir"))
     if not target_dir then
         write_json_status(403, "Forbidden", { code = 1, message = dir_err })
         return
@@ -3130,6 +4770,7 @@ function api_upload_check()
         return deny_system_operation()
     end
 
+    upload_safety_margin = upload_safety_margin or 0
     local required = total_size + upload_safety_margin
     local conflicts, blocked = find_upload_conflicts(target_dir, names)
     write_json({
@@ -3277,7 +4918,7 @@ function api_upload()
 
     local params = parse_query_params()
     local expected_size = parse_size(params.expected_size)
-    local target_dir, available, dir_err = get_upload_directory(params.target_dir)
+    local target_dir, available, upload_safety_margin, dir_err = get_upload_directory(params.target_dir)
     if expected_size == nil or not target_dir then
         local status = target_dir and 400 or 403
         write_json_status(status, status == 400 and "Bad Request" or "Forbidden", {
@@ -3289,6 +4930,7 @@ function api_upload()
     if not system_operations_allowed() and is_system_path(target_dir) then
         return deny_system_operation()
     end
+    upload_safety_margin = upload_safety_margin or 0
     if available < expected_size + upload_safety_margin then
         write_json_status(507, "Insufficient Storage", {
             code = 2,

@@ -437,6 +437,40 @@
     background: var(--fm-hover);
 }
 
+.fm-item-hover-card {
+    position: fixed;
+    z-index: 120;
+    display: none;
+    width: min(320px, calc(100vw - 24px));
+    pointer-events: none;
+    border: 1px solid var(--fm-border);
+    border-radius: 7px;
+    background: var(--fm-panel);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    color: var(--fm-text);
+    font-size: 12px;
+}
+
+.fm-item-hover-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 8px;
+    padding: 7px 10px;
+}
+
+.fm-item-hover-row + .fm-item-hover-row {
+    border-top: 1px solid var(--fm-border);
+}
+
+.fm-item-hover-label {
+    color: var(--fm-muted);
+}
+
+.fm-item-hover-value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .fm-item.selected {
     border-color: #98c5ef;
     background: var(--fm-selected);
@@ -964,21 +998,52 @@
     font-size: 13px;
 }
 
-.fm-form-input {
+.fm-form-input,
+.fm-form-select {
     box-sizing: border-box;
     width: 100%;
-    padding: 9px 10px;
+    height: 38px;
+    padding: 0 34px 0 12px;
     border: 1px solid var(--fm-border);
     border-radius: 6px;
     outline: none;
-    background: var(--fm-panel);
+    background-color: var(--fm-panel);
     color: var(--fm-text);
     font: inherit;
+    line-height: 38px;
 }
 
-.fm-form-input:focus {
+.fm-form-select {
+    background-image:
+        linear-gradient(45deg, transparent 50%, #6a7786 50%),
+        linear-gradient(135deg, #6a7786 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(50% - 1px),
+        calc(100% - 12px) calc(50% - 1px);
+    background-repeat: no-repeat;
+    background-size: 6px 6px, 6px 6px;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+[data-darkmode="true"] .fm-form-select {
+    background-image:
+        linear-gradient(45deg, transparent 50%, #9fb1c2 50%),
+        linear-gradient(135deg, #9fb1c2 50%, transparent 50%);
+}
+
+.fm-form-input:focus,
+.fm-form-select:focus {
     border-color: var(--fm-accent);
     box-shadow: 0 0 0 2px var(--fm-accent-soft);
+}
+
+.fm-form-help {
+    margin: -2px 0 12px;
+    overflow-wrap: anywhere;
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.5;
 }
 
 .fm-delete-copy {
@@ -1071,6 +1136,25 @@
     font-weight: 600;
 }
 
+.fm-context-menu button.has-submenu::after {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: auto;
+    margin-right: 3px;
+    border: solid currentColor;
+    border-width: 0 1.5px 1.5px 0;
+    color: var(--fm-muted);
+    content: "";
+    transform: rotate(-45deg);
+}
+
+.fm-context-menu-separator {
+    height: 1px;
+    margin: 4px 8px;
+    background: var(--fm-border);
+}
+
 .fm-context-menu button:disabled {
     opacity: 0.38;
     cursor: default;
@@ -1080,6 +1164,12 @@
     width: 15px;
     height: 15px;
     flex: 0 0 15px;
+}
+
+.fm-menu-image.placeholder {
+    background: transparent;
+    -webkit-mask-image: none;
+    mask-image: none;
 }
 
 .fm-modal-mask {
@@ -1117,7 +1207,8 @@
 }
 
 #fm_overwrite_dialog,
-#fm_package_confirm_dialog {
+#fm_package_confirm_dialog,
+#fm_archive_dialog {
     width: min(500px, calc(100vw - 32px));
 }
 
@@ -1243,12 +1334,15 @@
 }
 
 .fm-settings-body {
-    padding: 18px 18px 16px;
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    padding: 16px;
 }
 
 .fm-settings-dialog {
-    width: min(760px, calc(100vw - 32px));
-    overflow: visible;
+    width: min(900px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
 }
 
 .fm-settings-dialog .fm-dialog-header {
@@ -1257,14 +1351,72 @@
 }
 
 .fm-settings-shell {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr);
+    min-height: 420px;
+    overflow: hidden;
     border: 1px solid var(--fm-border);
-    border-radius: 18px;
+    border-radius: 8px;
     background: var(--fm-panel);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 [data-darkmode="true"] .fm-settings-shell {
     box-shadow: none;
+}
+
+.fm-settings-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    border-right: 1px solid var(--fm-border);
+    background: rgba(120, 132, 145, 0.06);
+}
+
+.fm-settings-menu-item {
+    display: flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fm-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.fm-settings-menu-item:hover {
+    background: var(--fm-hover);
+    color: var(--fm-text);
+}
+
+.fm-settings-menu-item.active {
+    background: var(--fm-accent-soft);
+    color: var(--fm-accent);
+}
+
+.fm-settings-content {
+    min-width: 0;
+}
+
+.fm-settings-panel {
+    display: none;
+    min-height: 100%;
+}
+
+.fm-settings-panel.active {
+    display: flex;
+    flex-direction: column;
+}
+
+.fm-settings-panel-main {
+    flex: 1;
+    min-height: 0;
 }
 
 .fm-settings-row {
@@ -1277,6 +1429,170 @@
 
 .fm-settings-row + .fm-settings-row {
     border-top: 1px solid var(--fm-border);
+}
+
+.fm-settings-intro {
+    padding: 18px 16px;
+    border-bottom: 1px solid var(--fm-border);
+}
+
+.fm-settings-intro-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.fm-settings-intro-title strong {
+    color: var(--fm-text);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.fm-settings-intro-desc {
+    margin-top: 6px;
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.fm-settings-fcm-note {
+    display: none;
+    margin-top: 10px;
+    padding: 9px 11px;
+    border: 1px solid rgba(40, 120, 212, 0.22);
+    border-radius: 6px;
+    background: rgba(40, 120, 212, 0.08);
+    color: var(--fm-text);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.fm-settings-page-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    border-top: 1px solid var(--fm-border);
+}
+
+.fm-nginx-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.fm-nginx-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(25, 195, 125, 0.12);
+    color: #168653;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+[data-darkmode="true"] .fm-nginx-status {
+    background: rgba(84, 212, 154, 0.12);
+    color: #54d49a;
+}
+
+.fm-nginx-status.checking {
+    background: rgba(120, 132, 145, 0.12);
+    color: var(--fm-muted);
+}
+
+.fm-nginx-command {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-width: 88px;
+    padding: 0 12px;
+    border: 1px solid var(--fm-border);
+    border-radius: 6px;
+    background: var(--fm-panel);
+    color: var(--fm-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+}
+
+.fm-nginx-command:hover {
+    border-color: var(--fm-accent);
+    color: var(--fm-accent);
+}
+
+.fm-nginx-command.primary {
+    border-color: var(--fm-accent);
+    background: var(--fm-accent);
+    color: #ffffff;
+}
+
+.fm-nginx-command:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.fm-nginx-install-body {
+    padding: 22px 24px 24px;
+}
+
+.fm-nginx-install-copy {
+    margin: 0;
+    color: var(--fm-text);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.fm-nginx-install-warning {
+    margin: 12px 0 0;
+    color: #b54708;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+[data-darkmode="true"] .fm-nginx-install-warning {
+    color: #f0ad66;
+}
+
+.fm-nginx-progress {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 88px;
+    text-align: center;
+}
+
+.fm-nginx-spinner {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    border: 3px solid rgba(40, 120, 212, 0.18);
+    border-top-color: var(--fm-accent);
+    border-radius: 50%;
+    animation: fm-terminal-spin 0.82s linear infinite;
+}
+
+.fm-nginx-progress-text {
+    color: var(--fm-text);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.fm-nginx-progress-hint {
+    margin-top: 4px;
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
 }
 
 .fm-settings-copy {
@@ -1350,6 +1666,11 @@
     box-shadow: 0 0 0 2px var(--fm-accent-soft);
 }
 
+.fm-settings-control:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
 .fm-settings-path-control {
     width: 260px;
     min-width: 260px;
@@ -1360,6 +1681,64 @@
 
 [data-darkmode="true"] .fm-settings-path-control {
     background-image: none;
+}
+
+.fm-settings-number-control {
+    width: 120px;
+    min-width: 120px;
+    padding-right: 12px;
+    background-image: none;
+    line-height: normal;
+}
+
+[data-darkmode="true"] .fm-settings-number-control {
+    background-image: none;
+}
+
+.fm-settings-input-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fm-settings-input-group .fm-settings-number-control {
+    flex: 0 0 auto;
+}
+
+.fm-settings-unit {
+    min-width: 56px;
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.fm-settings-field-group-title {
+    padding: 14px 16px 0;
+    color: var(--fm-muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.fm-settings-recommend {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border-bottom: 1px solid var(--fm-border);
+}
+
+.fm-settings-recommend-desc {
+    color: var(--fm-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.fm-settings-control-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .fm-settings-switch {
@@ -1419,13 +1798,6 @@
     background: #1fb975;
 }
 
-.fm-settings-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 14px 2px 2px;
-}
-
 .fm-property-icon {
     width: 68px;
     height: 68px;
@@ -1453,7 +1825,10 @@
 }
 
 #fm_package_install_dialog,
-#fm_thumbnail_dialog {
+#fm_thumbnail_dialog,
+#fm_archive_task_dialog,
+#fm_nginx_install_dialog,
+#fm_nginx_confirm_dialog {
     width: min(720px, calc(100vw - 32px));
     height: auto;
     max-height: min(660px, calc(100vh - 40px));
@@ -2014,6 +2389,16 @@
     font-size: 12px;
 }
 
+.fm-video-range-hint {
+    margin: 0 16px 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(240, 173, 78, 0.12);
+    color: #f0ad4e;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .fm-pdf-meta {
     display: flex;
     gap: 18px;
@@ -2043,46 +2428,6 @@
     color: #8fc8ff;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-}
-
-.fm-video-diagnostics {
-    flex: 0 0 auto;
-    border-top: 1px solid #303944;
-    background: #0c1219;
-    color: #c8d6e3;
-    font-size: 12px;
-}
-
-.fm-video-diagnostics summary {
-    padding: 9px 16px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.fm-video-log-tools {
-    padding: 0 14px 8px;
-}
-
-.fm-video-log-refresh {
-    padding: 5px 10px;
-    border: 1px solid #3b5268;
-    border-radius: 5px;
-    background: #162331;
-    color: #dce9f5;
-    cursor: pointer;
-    font: inherit;
-}
-
-.fm-video-log {
-    max-height: 180px;
-    margin: 0;
-    padding: 10px 14px;
-    overflow: auto;
-    border-top: 1px solid #23313f;
-    color: #a9c8e4;
-    font: 11px/1.55 Consolas, "Courier New", monospace;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
 }
 
 .fm-terminal-dialog {
@@ -2242,6 +2587,10 @@
     line-height: 1.6;
 }
 
+#fm_terminal_install_tool {
+    margin: 14px auto 0;
+}
+
 @keyframes fm-terminal-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -2274,6 +2623,29 @@
         width: min(100vw - 20px, 760px);
     }
 
+    .fm-settings-body {
+        padding: 10px;
+    }
+
+    .fm-settings-shell {
+        display: block;
+        min-height: 0;
+    }
+
+    .fm-settings-menu {
+        flex-direction: row;
+        gap: 6px;
+        overflow-x: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--fm-border);
+    }
+
+    .fm-settings-menu-item {
+        flex: 0 0 auto;
+        min-height: 34px;
+        white-space: nowrap;
+    }
+
     .fm-settings-row {
         align-items: flex-start;
         flex-direction: column;
@@ -2285,8 +2657,14 @@
     }
 
     .fm-settings-control-wrap,
-    .fm-settings-switch {
+    .fm-settings-switch,
+    .fm-nginx-actions {
         align-self: flex-end;
+    }
+
+    .fm-settings-intro-title {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .fm-settings-path-control {
@@ -2491,6 +2869,14 @@
         <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/download.svg')" aria-hidden="true"></span>
         <span><%:Download file%></span>
     </button>
+    <button id="fm_menu_compress" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/archive.svg')" aria-hidden="true"></span>
+        <span><%:Compress%></span>
+    </button>
+    <button id="fm_menu_extract" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/open.svg')" aria-hidden="true"></span>
+        <span><%:Extract%></span>
+    </button>
     <button id="fm_menu_copy" type="button">
         <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/copy.svg')" aria-hidden="true"></span>
         <span><%:Copy%></span>
@@ -2535,6 +2921,10 @@
 </div>
 
 <div id="fm_blank_menu" class="fm-context-menu">
+    <button id="fm_menu_sort" class="has-submenu" type="button">
+        <span class="fm-menu-image placeholder" aria-hidden="true"></span>
+        <span><%:Sort by%></span>
+    </button>
     <button id="fm_menu_new_folder" type="button">
         <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/new_folder.svg')" aria-hidden="true"></span>
         <span><%:New folder%></span>
@@ -2559,6 +2949,16 @@
         <span class="fm-menu-image" style="--fm-icon:url('<%=resource%>/harbor_file/icons/refresh.svg')" aria-hidden="true"></span>
         <span><%:Refresh%></span>
     </button>
+</div>
+
+<div id="fm_sort_menu" class="fm-context-menu">
+    <button type="button" data-sort-field="name"><span><%:Name%></span></button>
+    <button type="button" data-sort-field="mtime"><span><%:Modified%></span></button>
+    <button type="button" data-sort-field="type"><span><%:Type%></span></button>
+    <button type="button" data-sort-field="size"><span><%:Size%></span></button>
+    <div class="fm-context-menu-separator" role="separator"></div>
+    <button type="button" data-sort-order="asc"><span><%:Ascending%></span></button>
+    <button type="button" data-sort-order="desc"><span><%:Descending%></span></button>
 </div>
 
 <div id="fm_modal_mask" class="fm-modal-mask"></div>
@@ -2614,65 +3014,245 @@
     </div>
     <div class="fm-settings-body">
         <div class="fm-settings-shell">
-            <div class="fm-settings-row">
-                <div class="fm-settings-copy">
-                    <span class="fm-settings-label"><%:Default view%></span>
-                    <div class="fm-settings-desc"><%:Choose how files and folders are shown when Harbor File opens.%></div>
-                </div>
-                <div class="fm-settings-control-wrap">
-                    <select id="fm_settings_view_mode" class="fm-settings-control">
-                        <option value="0"><%:Large icons%></option>
-                        <option value="1"><%:Medium icons%></option>
-                        <option value="2"><%:Small icons%></option>
-                        <option value="3"><%:List%></option>
-                        <option value="4"><%:Details%></option>
-                        <option value="5"><%:Tiles%></option>
-                    </select>
-                </div>
+            <div class="fm-settings-menu" role="tablist" aria-label="<%:Settings categories%>">
+                <button id="fm_settings_tab_basic" class="fm-settings-menu-item active" type="button" role="tab" aria-selected="true" aria-controls="fm_settings_panel_basic" data-settings-tab="basic"><%:Basic settings%></button>
+                <button id="fm_settings_tab_nginx" class="fm-settings-menu-item" type="button" role="tab" aria-selected="false" aria-controls="fm_settings_panel_nginx" data-settings-tab="nginx"><%:Web service%></button>
             </div>
-            <div class="fm-settings-row">
-                <div class="fm-settings-copy">
-                    <span class="fm-settings-label"><%:Home directory%></span>
-                    <div class="fm-settings-desc"><%:Common folders are created under this directory and shown in Quick access.%></div>
+            <div class="fm-settings-content">
+                <div id="fm_settings_panel_basic" class="fm-settings-panel active" role="tabpanel" aria-labelledby="fm_settings_tab_basic">
+                    <div class="fm-settings-panel-main">
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label"><%:Default view%></span>
+                                <div class="fm-settings-desc"><%:Choose how files and folders are shown when Harbor File opens.%></div>
+                            </div>
+                            <div class="fm-settings-control-wrap">
+                                <select id="fm_settings_view_mode" class="fm-settings-control">
+                                    <option value="0"><%:Large icons%></option>
+                                    <option value="1"><%:Medium icons%></option>
+                                    <option value="2"><%:Small icons%></option>
+                                    <option value="3"><%:List%></option>
+                                    <option value="4"><%:Details%></option>
+                                    <option value="5"><%:Tiles%></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label"><%:Home directory%></span>
+                                <div class="fm-settings-desc"><%:Common folders are created under this directory and shown in Quick access.%></div>
+                            </div>
+                            <div class="fm-settings-control-wrap">
+                                <input id="fm_settings_home_dir" class="fm-settings-control fm-settings-path-control" type="text" placeholder="/tmp/root">
+                            </div>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label"><%:System folder operations%></span>
+                                <div class="fm-settings-desc"><%:Allow create, rename, move, upload and delete actions in protected system folders.%></div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_system_operations">
+                                <input id="fm_settings_system_operations" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label"><%:Show hidden files%></span>
+                                <div class="fm-settings-desc"><%:Show Linux hidden files and folders whose names start with a dot.%></div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_show_hidden">
+                                <input id="fm_settings_show_hidden" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label"><%:Thumbnails%></span>
+                                <div class="fm-settings-desc"><%:Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders.%></div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_thumbnails">
+                                <input id="fm_settings_thumbnails" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="fm-settings-page-actions">
+                        <button id="fm_settings_basic_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
+                        <button id="fm_settings_basic_save" class="fm-dialog-action primary" type="button"><%:Save%></button>
+                    </div>
                 </div>
-                <div class="fm-settings-control-wrap">
-                    <input id="fm_settings_home_dir" class="fm-settings-control fm-settings-path-control" type="text" placeholder="/tmp/root">
+                <div id="fm_settings_panel_nginx" class="fm-settings-panel" role="tabpanel" aria-labelledby="fm_settings_tab_nginx">
+                    <div class="fm-settings-panel-main">
+                        <div class="fm-settings-intro">
+                            <div class="fm-settings-intro-title">
+                                <strong id="fm_web_server_title">Nginx</strong>
+                                <div class="fm-nginx-actions">
+                                    <span id="fm_nginx_status" class="fm-nginx-status checking"><%:Checking%></span>
+                                    <button id="fm_nginx_install" class="fm-nginx-command primary" type="button" style="display:none"><%:Install%></button>
+                                </div>
+                            </div>
+                            <div class="fm-settings-intro-desc"><%:A high-performance web server that improves video playback and file operation performance.%></div>
+                            <div id="fm_nginx_fcm_note" class="fm-settings-fcm-note"><%:This system is FanchmWrt. The default web server has already been optimized for basic file management and video playback, so switching to Nginx is not required.%></div>
+                        </div>
+                        <div id="fm_nginx_options">
+                            <div class="fm-settings-recommend">
+                                <button id="fm_nginx_recommend" class="fm-nginx-command primary" type="button"><%:Use recommended configuration%></button>
+                                <div class="fm-settings-recommend-desc"><%:Default configuration may keep upload and download limits. Recommended configuration can remove some limits.%></div>
+                            </div>
+                            <div class="fm-settings-field-group-title"><%:Nginx parameters%></div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label"><%:Client request body size%></span>
+                                    <div class="fm-settings-desc"><%:Set client_max_body_size in megabytes. Enter 0 for unlimited.%></div>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_client_max_body_size" class="fm-settings-control fm-settings-number-control" type="number" min="0" max="1024" step="1">
+                                        <span id="fm_client_max_body_size_unit" class="fm-settings-unit">M</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label"><%:File upload buffering%></span>
+                                    <div class="fm-settings-desc"><%:When enabled, uploaded files are buffered before being written to disk.%></div>
+                                </div>
+                                <label class="fm-settings-switch" for="fm_settings_uwsgi_request_buffering">
+                                    <input id="fm_settings_uwsgi_request_buffering" type="checkbox">
+                                    <span class="fm-settings-switch-slider"></span>
+                                </label>
+                            </div>
+                            <div class="fm-settings-field-group-title"><%:uWSGI parameters%></div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-on-as</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-control-line">
+                                        <label class="fm-settings-switch" for="fm_settings_reload_on_as_enabled">
+                                            <input id="fm_settings_reload_on_as_enabled" type="checkbox">
+                                            <span class="fm-settings-switch-slider"></span>
+                                        </label>
+                                        <input id="fm_settings_reload_on_as" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-on-rss</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-control-line">
+                                        <label class="fm-settings-switch" for="fm_settings_reload_on_rss_enabled">
+                                            <input id="fm_settings_reload_on_rss_enabled" type="checkbox">
+                                            <span class="fm-settings-switch-slider"></span>
+                                        </label>
+                                        <input id="fm_settings_reload_on_rss" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">post-buffering</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_post_buffering" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">limit-as</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_limit_as" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-mercy</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_reload_mercy" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">buffer-size</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_buffer_size" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="fm_uhttpd_options" style="display:none">
+                            <div class="fm-settings-intro">
+                                <div class="fm-settings-intro-title">
+                                    <strong>uhttpd</strong>
+                                </div>
+                                <div class="fm-settings-intro-desc"><%:If large file uploads fail, increase the timeout values.%></div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label"><%:Script timeout%></span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_uhttpd_script_timeout" class="fm-settings-control fm-settings-number-control" type="number" min="0" step="1">
+                                        <span class="fm-settings-unit"><%:Seconds%></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label"><%:Network timeout%></span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_uhttpd_network_timeout" class="fm-settings-control fm-settings-number-control" type="number" min="0" step="1">
+                                        <span class="fm-settings-unit"><%:Seconds%></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fm_nginx_page_actions" class="fm-settings-page-actions">
+                        <button id="fm_settings_nginx_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
+                        <button id="fm_settings_nginx_save" class="fm-dialog-action primary" type="button"><%:Save%></button>
+                    </div>
                 </div>
-            </div>
-            <div class="fm-settings-row">
-                <div class="fm-settings-copy">
-                    <span class="fm-settings-label"><%:System folder operations%></span>
-                    <div class="fm-settings-desc"><%:Allow create, rename, move, upload and delete actions in protected system folders.%></div>
-                </div>
-                <label class="fm-settings-switch" for="fm_settings_system_operations">
-                    <input id="fm_settings_system_operations" type="checkbox">
-                    <span class="fm-settings-switch-slider"></span>
-                </label>
-            </div>
-            <div class="fm-settings-row">
-                <div class="fm-settings-copy">
-                    <span class="fm-settings-label"><%:Show hidden files%></span>
-                    <div class="fm-settings-desc"><%:Show Linux hidden files and folders whose names start with a dot.%></div>
-                </div>
-                <label class="fm-settings-switch" for="fm_settings_show_hidden">
-                    <input id="fm_settings_show_hidden" type="checkbox">
-                    <span class="fm-settings-switch-slider"></span>
-                </label>
-            </div>
-            <div class="fm-settings-row">
-                <div class="fm-settings-copy">
-                    <span class="fm-settings-label"><%:Thumbnails%></span>
-                    <div class="fm-settings-desc"><%:Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders.%></div>
-                </div>
-                <label class="fm-settings-switch" for="fm_settings_thumbnails">
-                    <input id="fm_settings_thumbnails" type="checkbox">
-                    <span class="fm-settings-switch-slider"></span>
-                </label>
             </div>
         </div>
-        <div class="fm-settings-actions">
-            <button id="fm_settings_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
-            <button id="fm_settings_save" class="fm-dialog-action primary" type="button"><%:Save%></button>
+    </div>
+</section>
+
+<section id="fm_nginx_confirm_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_nginx_confirm_title">
+    <div class="fm-dialog-header">
+        <div id="fm_nginx_confirm_title" class="fm-dialog-title"><%:Install Nginx%></div>
+        <button class="fm-dialog-close" type="button" aria-label="<%:Close%>">&times;</button>
+    </div>
+    <div class="fm-nginx-install-body">
+        <p class="fm-nginx-install-copy"><%:Install Nginx now?%></p>
+        <p class="fm-nginx-install-warning"><%:Installing Nginx will replace the current web server. After installation, the web service will restart and you must access the management interface through HTTPS.%></p>
+        <div class="fm-dialog-actions">
+            <button id="fm_nginx_confirm_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
+            <button id="fm_nginx_confirm_start" class="fm-dialog-action primary" type="button"><%:Install%></button>
+        </div>
+    </div>
+</section>
+
+<section id="fm_nginx_install_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_nginx_install_title">
+    <div class="fm-dialog-header">
+        <div id="fm_nginx_install_title" class="fm-dialog-title"><%:Installing Nginx%></div>
+    </div>
+    <div class="fm-nginx-install-body">
+        <div class="fm-nginx-progress">
+            <div id="fm_nginx_spinner" class="fm-nginx-spinner" aria-hidden="true"></div>
+            <div id="fm_nginx_install_text" class="fm-nginx-progress-text"><%:Installing Nginx, please wait.%></div>
+        </div>
+        <div id="fm_nginx_install_hint" class="fm-nginx-progress-hint"><%:The web interface may be interrupted during installation. After installation, the login page will be reopened. If it cannot be accessed, please try again later.%></div>
+        <div id="fm_nginx_install_actions" class="fm-dialog-actions" style="display:none">
+            <button id="fm_nginx_install_done" class="fm-dialog-action primary" type="button"><%:Close%></button>
         </div>
     </div>
 </section>
@@ -2735,6 +3315,45 @@
         <div class="fm-dialog-actions">
             <button id="fm_target_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
             <button id="fm_target_confirm" class="fm-dialog-action primary" type="button"><%:Confirm%></button>
+        </div>
+    </div>
+</section>
+
+<section id="fm_archive_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_archive_title">
+    <div class="fm-dialog-header">
+        <div id="fm_archive_title" class="fm-dialog-title"><%:Compress%></div>
+        <button class="fm-dialog-close" type="button" aria-label="<%:Close%>">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <div id="fm_archive_source" class="fm-form-help">-</div>
+        <label class="fm-form-label" for="fm_archive_format"><%:Archive format%></label>
+        <select id="fm_archive_format" class="fm-form-select">
+            <option value="tar.gz">tar.gz</option>
+        </select>
+        <label class="fm-form-label" for="fm_archive_name"><%:Archive name%></label>
+        <input id="fm_archive_name" class="fm-form-input" type="text" maxlength="255" autocomplete="off">
+        <div class="fm-dialog-actions">
+            <button id="fm_archive_cancel" class="fm-dialog-action" type="button"><%:Cancel%></button>
+            <button id="fm_archive_start" class="fm-dialog-action primary" type="button"><%:Compress%></button>
+        </div>
+    </div>
+</section>
+
+<section id="fm_archive_task_dialog" class="fm-dialog fm-text-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_archive_task_title">
+    <div class="fm-dialog-header">
+        <div id="fm_archive_task_title" class="fm-dialog-title"><%:Archive operation%></div>
+        <button id="fm_archive_task_close" class="fm-dialog-close" type="button" aria-label="<%:Close%>">&times;</button>
+    </div>
+    <div class="fm-package-install-body">
+        <div id="fm_archive_task_status" class="fm-package-status">-</div>
+        <div class="fm-package-list">
+            <div class="fm-package-label"><%:Path%></div><div id="fm_archive_task_path" class="fm-package-value">-</div>
+            <div class="fm-package-label"><%:Format%></div><div id="fm_archive_task_format" class="fm-package-value">-</div>
+            <div class="fm-package-label"><%:Exit code%></div><div id="fm_archive_task_exit" class="fm-package-value">-</div>
+        </div>
+        <pre id="fm_archive_task_log" class="fm-package-log"><%:No log yet%></pre>
+        <div class="fm-dialog-actions">
+            <button id="fm_archive_task_done" class="fm-dialog-action primary" type="button"><%:Close%></button>
         </div>
     </div>
 </section>
@@ -2907,11 +3526,7 @@
         <span id="fm_video_buffer" class="fm-video-buffer"><%:Buffered%>: 0%</span>
         <span id="fm_video_size">-</span>
     </div>
-    <details class="fm-video-diagnostics">
-        <summary><%:Video diagnostics%></summary>
-        <div class="fm-video-log-tools"><button id="fm_video_log_refresh" class="fm-video-log-refresh" type="button"><%:Refresh log%></button></div>
-        <pre id="fm_video_log" class="fm-video-log"><%:No diagnostic log%></pre>
-    </details>
+    <div id="fm_video_range_hint" class="fm-video-range-hint" style="display:none"><%:Web server does not support Range requests, switching to nginx is recommended for better playback%></div>
 </section>
 
 <section id="fm_terminal_dialog" class="fm-dialog fm-terminal-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_terminal_title">
@@ -2932,6 +3547,7 @@
             <div class="fm-terminal-panel">
                 <div id="fm_terminal_error_text" class="fm-terminal-message"><%:Terminal connection failed%></div>
                 <div id="fm_terminal_error_hint" class="fm-terminal-subtext"><%:Connection failed, please check whether the ttyd service is installed%></div>
+                <button id="fm_terminal_install_tool" class="fm-dialog-action primary" type="button" style="display:none"><%:Install terminal plugin%></button>
             </div>
         </div>
     </div>
@@ -2942,8 +3558,10 @@
     var api = {
         navigation: '<%=url("admin/local_fs/navigation")%>',
         terminal_info: '<%=url("admin/local_fs/terminal_info")%>',
+        terminal_tool_install_start: '<%=url("admin/local_fs/terminal_tool_install_start")%>',
         preferences: '<%=url("admin/local_fs/preferences")%>',
         save_preferences: '<%=url("admin/local_fs/save_preferences")%>',
+        nginx_install_start: '<%=url("admin/local_fs/nginx_install_start")%>',
         list: '<%=url("admin/local_fs/list")%>',
         download: '<%=url("admin/local_fs/download")%>',
         read_text: '<%=url("admin/local_fs/read_text")%>',
@@ -2956,7 +3574,7 @@
         thumbnail_tool_install_start: '<%=url("admin/local_fs/thumbnail_tool_install_start")%>',
         pdf: '<%=url("admin/local_fs/pdf")%>',
         video: '<%=url("admin/local_fs/video")%>',
-        video_log: '<%=url("admin/local_fs/video_log")%>',
+        video_check: '<%=url("admin/local_fs/video_check")%>',
         upload_check: '<%=url("admin/local_fs/upload_check")%>',
         upload: '<%=url("admin/local_fs/upload")%>',
         create_directory: '<%=url("admin/local_fs/create_directory")%>',
@@ -2968,14 +3586,19 @@
         batch_copy: '<%=url("admin/local_fs/batch_copy")%>',
         batch_move: '<%=url("admin/local_fs/batch_move")%>',
         batch_delete: '<%=url("admin/local_fs/batch_delete")%>',
+        archive_create_start: '<%=url("admin/local_fs/archive_create_start")%>',
+        archive_extract_start: '<%=url("admin/local_fs/archive_extract_start")%>',
+        archive_status: '<%=url("admin/local_fs/archive_status")%>',
         package_install_start: '<%=url("admin/local_fs/package_install_start")%>',
         package_install_status: '<%=url("admin/local_fs/package_install_status")%>'
     };
     var icon_base = '<%=resource%>/harbor_file/icons/';
-    var status_duration_fast = 500;
+    var status_duration_fast = 1500;
     var status_duration_warning = 2000;
     var status_duration_long = 3000;
     var labels = {
+        video_format_error: '<%:This video format or codec is not supported by the browser%>',
+        video_no_range: '<%:Web server does not support Range requests and available memory is too small to play this video%>',
         quick_access: '<%:Quick access%>',
         this_pc: '<%:This device%>',
         frequent_folders: '<%:Frequent folders%>',
@@ -2984,6 +3607,7 @@
         folder: '<%:Folder%>',
         file: '<%:File%>',
         name: '<%:Name%>',
+        path: '<%:Path%>',
         size: '<%:Size%>',
         type: '<%:Type%>',
         modified: '<%:Modified%>',
@@ -3026,7 +3650,7 @@
         no_files: '<%:No files were selected%>',
         folder_not_supported: '<%:Folder upload is not supported%>',
         insufficient_space: '<%:Not enough free space%>',
-        space_less_than_50mb: '<%:Available space is less than 50MB, operation is not allowed%>',
+        space_less_than_50mb: '<%:Available space is less than 5% of the current partition, operation is not allowed%>',
         blocked_conflict: '<%:A directory or special file already uses this name%>',
         select_upload_target: '<%:Drop files on a writable directory%>',
         new_folder: '<%:New folder%>',
@@ -3054,6 +3678,24 @@
         move_item_same: '<%:Source and destination folders cannot be the same%>',
         copy_complete: '<%:Copy complete%>',
         move_complete: '<%:Move complete%>',
+        compress: '<%:Compress%>',
+        extract: '<%:Extract%>',
+        archive_format: '<%:Archive format%>',
+        archive_name: '<%:Archive name%>',
+        archive_operation: '<%:Archive operation%>',
+        creating_archive: '<%:Creating archive%>',
+        extracting_archive: '<%:Extracting archive%>',
+        archive_created: '<%:Archive created successfully%>',
+        archive_extracted: '<%:Archive extracted successfully%>',
+        archive_failed: '<%:Archive operation failed%>',
+        archive_busy: '<%:Another archive task is already running%>',
+        archive_task_not_found: '<%:Archive task not found%>',
+        archive_command_missing: '<%:Archive command not found%>',
+        archive_missing_tool_install: '<%:Missing %s tool, please install it from Software Center first%>',
+        unsupported_archive: '<%:Unsupported archive format%>',
+        archive_same_directory_required: '<%:Archive sources must be in the same directory%>',
+        archive_single_file_only: '<%:This archive format only supports one regular file%>',
+        preparing_archive: '<%:Preparing archive%>',
         multiple_items: '<%:Multiple items%>',
         selected_items: '<%:Selected %d items%>',
         delete_item_confirm: '<%:Are you sure you want to permanently delete this item?%>',
@@ -3093,6 +3735,16 @@
         disabled: '<%:Disabled%>',
         enabled: '<%:Enabled%>',
         settings_saved: '<%:Settings saved%>',
+        checking: '<%:Checking%>',
+        installed: '<%:Installed%>',
+        not_installed: '<%:Not installed%>',
+        unlimited: '<%:Unlimited%>',
+        nginx_configuration: '<%:Nginx configuration%>',
+        nginx_settings_saved: '<%:Nginx configuration saved%>',
+        installing_nginx: '<%:Installing Nginx, please wait.%>',
+        nginx_restart_countdown: '<%:Installing, please wait, %d seconds remaining.%>',
+        nginx_install_failed: '<%:Nginx installation failed%>',
+        web_server_settings_saved: '<%:Web service configuration saved%>',
         system_folder_blocked: '<%:System folder operations are disabled%>',
         uploaded: '<%:Uploaded%>',
         buffered: '<%:Buffered%>',
@@ -3126,7 +3778,9 @@
         terminal_failed_hint: '<%:Connection failed, please check whether the ttyd service is installed%>',
         terminal_current_path: '<%:Current path%>',
         terminal_service_url: '<%:Service address%>',
-        terminal_service_missing: '<%:The ttyd service is not installed or not configured%>'
+        terminal_service_missing: '<%:The ttyd service is not installed or not configured%>',
+        install_terminal_tool: '<%:Install terminal plugin%>',
+        web_service: '<%:Web service%>'
     };
     var system_folder_paths = {
         '/bin': true,
@@ -3144,8 +3798,32 @@
     };
     var state = {
         navigation: { quick_access: [], folders: [], drives: [] },
-        preferences: { view_mode: 1, allow_system_operations: 0, show_hidden_files: 0, home_dir: '/tmp/root', enable_thumbnails: 0 },
+        preferences: {
+            view_mode: 1,
+            allow_system_operations: 0,
+            show_hidden_files: 0,
+            home_dir: '/tmp/root',
+            enable_thumbnails: 0,
+            uwsgi_request_buffering: 0,
+            client_max_body_size: 128,
+            uwsgi_config_available: false,
+            'reload-on-as': 256,
+            'reload-on-as_enabled': 0,
+            'reload-on-rss': 192,
+            'reload-on-rss_enabled': 0,
+            'post-buffering': 8192,
+            'limit-as': 1000,
+            'reload-mercy': 8,
+            'buffer-size': 10000,
+            uhttpd_config_available: false,
+            uhttpd_script_timeout: 600,
+            uhttpd_network_timeout: 600,
+            web_server: 'unknown',
+            nginx_running: false,
+            fcm: 0
+        },
         current: null,
+        current_directory_data: null,
         selected: null,
         selected_items: [],
         selected_order: [],
@@ -3156,6 +3834,12 @@
         selection_moved: false,
         selection_start_x: 0,
         selection_start_y: 0,
+        item_hover_timer: null,
+        item_hover_card: null,
+        item_hover_event: null,
+        sort_field: 'name',
+        sort_order: 'asc',
+        sort_path: '',
         suppress_next_click: false,
         context_item: null,
         history: [],
@@ -3173,6 +3857,12 @@
         install_poll_timer: null,
         install_item: null,
         install_task: null,
+        archive_poll_timer: null,
+        archive_items: [],
+        archive_task: null,
+        nginx_installing: false,
+        nginx_install_task: null,
+        nginx_install_countdown_timer: null,
         thumbnail_poll_timer: null,
         thumbnail_task: null,
         thumbnail_path: '',
@@ -3258,10 +3948,10 @@
     }
 
     function set_write_block_status(message) {
-        set_status(message, String(message || '').indexOf('50MB') >= 0 ? 'error' : 'warning');
+        set_status(message, String(message || '').indexOf('5%') >= 0 ? 'error' : 'warning');
     }
 
-    function request_write(url, data, success_message, on_ok) {
+    function request_write(url, data, success_message, on_ok, on_error) {
         $.ajax({
             url: url,
             type: 'POST',
@@ -3270,6 +3960,9 @@
             success: function(res) {
                 if (!res || res.code !== 0) {
                     set_error_status((res && res.message) || labels.operation_failed);
+                    if (on_error) {
+                        on_error((res && res.message) || labels.operation_failed);
+                    }
                     return;
                 }
                 set_status(success_message, 'success');
@@ -3278,7 +3971,40 @@
                 }
             },
             error: function(xhr) {
-                set_error_status(upload_error_message(xhr, labels.operation_failed));
+                var message = upload_error_message(xhr, labels.operation_failed);
+                set_error_status(message);
+                if (on_error) {
+                    on_error(message);
+                }
+            }
+        });
+    }
+
+    function archive_error_message(res, fallback) {
+        var data = (res && res.data) || {};
+        if (data.missing_tool) {
+            return format_label(labels.archive_missing_tool_install, data.missing_tool);
+        }
+        return (res && res.message) || fallback || labels.archive_failed;
+    }
+
+    function request_archive_write(url, data, on_ok) {
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: data,
+            dataType: 'json',
+            success: function(res) {
+                if (!res || res.code !== 0) {
+                    set_error_status(archive_error_message(res, labels.archive_failed));
+                    return;
+                }
+                if (on_ok) {
+                    on_ok(res.data || {});
+                }
+            },
+            error: function(xhr) {
+                set_error_status(archive_error_message(response_json(xhr), labels.archive_failed));
             }
         });
     }
@@ -3398,6 +4124,176 @@
         return package_ext_value(ext, path) === 'apk' ? 'apk' : 'opkg';
     }
 
+    function archive_format_suffix(format) {
+        return {
+            'tar.gz': '.tar.gz'
+        }[format] || '.tar.gz';
+    }
+
+    function archive_file_name(path) {
+        return String(path || '').replace(/^.*\//, '');
+    }
+
+    function archive_base_name(name) {
+        var value = String(name || 'archive');
+        return value.replace(/(\.tar\.gz|\.tgz|\.tar|\.zip|\.gz)$/i, '') || 'archive';
+    }
+
+    function archive_extract_format(item) {
+        var name = String((item && item.name) || '').toLowerCase();
+        if (/\.tar\.gz$/.test(name)) {
+            return 'tar.gz';
+        }
+        if (/\.tgz$/.test(name)) {
+            return 'tgz';
+        }
+        if (/\.tar$/.test(name)) {
+            return 'tar';
+        }
+        if (/\.zip$/.test(name)) {
+            return 'zip';
+        }
+        if (/\.gz$/.test(name)) {
+            return 'gz';
+        }
+        return '';
+    }
+
+    function is_archive_item(item) {
+        return !!(item && item.type !== 'directory' && archive_extract_format(item));
+    }
+
+    function default_archive_name(items, format) {
+        var base = 'archive';
+        if (items.length === 1) {
+            base = archive_base_name(items[0].name || archive_file_name(items[0].path));
+        } else if (state.current && state.current.path) {
+            base = archive_base_name(archive_file_name(state.current.path));
+        }
+        return base + archive_format_suffix(format);
+    }
+
+    function sync_archive_format_options() {
+        var items = normalize_item_list(state.archive_items || []);
+        var format_select = document.getElementById('fm_archive_format');
+        if (format_select.value !== 'tar.gz') {
+            format_select.value = 'tar.gz';
+        }
+        document.getElementById('fm_archive_name').value = default_archive_name(items, format_select.value);
+    }
+
+    function open_archive_dialog(items) {
+        items = normalize_item_list(items);
+        if (!items.length || !state.current || state.current.kind !== 'directory') {
+            return;
+        }
+        state.archive_items = items;
+        document.getElementById('fm_archive_title').textContent = labels.compress;
+        document.getElementById('fm_archive_source').textContent =
+            items.length === 1 ? items[0].path : format_label(labels.selected_items, items.length);
+        document.getElementById('fm_archive_format').value = 'tar.gz';
+        sync_archive_format_options();
+        open_modal('fm_archive_dialog');
+        document.getElementById('fm_archive_name').focus();
+    }
+
+    function update_archive_task_view(data) {
+        var task = data || {};
+        state.archive_task = task;
+        var creating = task.mode !== 'extract';
+        document.getElementById('fm_archive_task_title').textContent = task.done ?
+            (task.success ? (creating ? labels.archive_created : labels.archive_extracted) : labels.archive_failed) :
+            (creating ? labels.creating_archive : labels.extracting_archive);
+        document.getElementById('fm_archive_task_status').textContent =
+            task.message || (creating ? labels.creating_archive : labels.extracting_archive);
+        document.getElementById('fm_archive_task_path').textContent =
+            task.output_path || task.destination_path || task.path || '-';
+        document.getElementById('fm_archive_task_format').textContent = task.format || '-';
+        document.getElementById('fm_archive_task_exit').textContent =
+            task.exit_code === undefined || task.exit_code === null ? '-' : String(task.exit_code);
+        document.getElementById('fm_archive_task_log').textContent = task.log || labels.no_log_yet;
+        document.getElementById('fm_archive_task_close').disabled = !task.done;
+        document.getElementById('fm_archive_task_done').disabled = !task.done;
+    }
+
+    function stop_archive_poll() {
+        if (state.archive_poll_timer) {
+            clearTimeout(state.archive_poll_timer);
+            state.archive_poll_timer = null;
+        }
+    }
+
+    function poll_archive_task(task_id) {
+        stop_archive_poll();
+        $.ajax({
+            url: api.archive_status,
+            type: 'GET',
+            data: { task_id: task_id },
+            dataType: 'json',
+            success: function(res) {
+                if (!res || res.code !== 0) {
+                    set_error_status((res && res.message) || labels.request_failed);
+                    return;
+                }
+                update_archive_task_view(res.data || {});
+                if (state.archive_task && !state.archive_task.done) {
+                    state.archive_poll_timer = setTimeout(function() {
+                        poll_archive_task(task_id);
+                    }, 1000);
+                    return;
+                }
+                if (state.archive_task && state.archive_task.done) {
+                    set_status(
+                        state.archive_task.message || (state.archive_task.success ? labels.archive_created : labels.archive_failed),
+                        state.archive_task.success ? 'success' : 'error'
+                    );
+                    if (state.archive_task.success) {
+                        refresh_after_write(state.archive_task.output_path || state.archive_task.destination_path);
+                    }
+                }
+            },
+            error: function(xhr) {
+                set_error_status(upload_error_message(xhr, labels.request_failed));
+            }
+        });
+    }
+
+    function start_archive_progress(data) {
+        close_modal();
+        update_archive_task_view(data || {});
+        open_modal('fm_archive_task_dialog');
+        if (data && data.task_id) {
+            poll_archive_task(data.task_id);
+        }
+    }
+
+    function submit_archive_dialog() {
+        var items = normalize_item_list(state.archive_items || []);
+        var format = document.getElementById('fm_archive_format').value;
+        var output_name = document.getElementById('fm_archive_name').value.trim();
+        if (!items.length) {
+            set_warning_status(labels.no_files);
+            return;
+        }
+        if (!output_name || /[\\\/\x00-\x1f\x7f]/.test(output_name)) {
+            set_warning_status(labels.invalid_name);
+            return;
+        }
+        request_archive_write(api.archive_create_start, {
+            sources: JSON.stringify(item_list_paths(items)),
+            format: format,
+            output_name: output_name
+        }, start_archive_progress);
+    }
+
+    function start_archive_extract(item) {
+        if (!is_archive_item(item)) {
+            set_warning_status(labels.unsupported_archive);
+            return;
+        }
+        request_archive_write(api.archive_extract_start, { path: item.path }, start_archive_progress);
+    }
+
     function is_system_folder(path) {
         var current_path = String(path || '');
         for (var root in system_folder_paths) {
@@ -3497,36 +4393,104 @@
         button.title = disabled && reason ? reason : '';
     }
 
+    function normalize_integer_setting(value, fallback) {
+        var number = Number(value);
+        return isNaN(number) ? fallback : Math.floor(number);
+    }
+
     function apply_preferences(data) {
         var view_value = Number(data && data.view_mode);
         var allow_value = Number(data && data.allow_system_operations);
         var hidden_value = Number(data && data.show_hidden_files);
         var thumbnail_value = Number(data && data.enable_thumbnails);
+        var request_buffering_value = Number(data && data.uwsgi_request_buffering);
+        var body_size_value = Number(data && data.client_max_body_size);
         state.preferences.view_mode = isNaN(view_value) ? 1 : view_value;
         state.preferences.allow_system_operations = allow_value === 1 ? 1 : 0;
         state.preferences.show_hidden_files = hidden_value === 1 ? 1 : 0;
         state.preferences.enable_thumbnails = thumbnail_value === 1 ? 1 : 0;
+        state.preferences.uwsgi_request_buffering = request_buffering_value === 1 ? 1 : 0;
+        state.preferences.client_max_body_size =
+            isNaN(body_size_value) ? 128 : Math.max(0, Math.min(1024, Math.floor(body_size_value)));
+        state.preferences.uwsgi_config_available = data && data.uwsgi_config_available === true;
+        state.preferences['reload-on-as'] =
+            normalize_integer_setting(data && data['reload-on-as'], state.preferences['reload-on-as']);
+        state.preferences['reload-on-as_enabled'] =
+            Number(data && data['reload-on-as_enabled']) === 1 ? 1 : 0;
+        state.preferences['reload-on-rss'] =
+            normalize_integer_setting(data && data['reload-on-rss'], state.preferences['reload-on-rss']);
+        state.preferences['reload-on-rss_enabled'] =
+            Number(data && data['reload-on-rss_enabled']) === 1 ? 1 : 0;
+        state.preferences['post-buffering'] =
+            normalize_integer_setting(data && data['post-buffering'], state.preferences['post-buffering']);
+        state.preferences['limit-as'] =
+            normalize_integer_setting(data && data['limit-as'], state.preferences['limit-as']);
+        state.preferences['reload-mercy'] =
+            normalize_integer_setting(data && data['reload-mercy'], state.preferences['reload-mercy']);
+        state.preferences['buffer-size'] =
+            normalize_integer_setting(data && data['buffer-size'], state.preferences['buffer-size']);
+        state.preferences.uhttpd_config_available = data && data.uhttpd_config_available === true;
+        state.preferences.uhttpd_script_timeout =
+            normalize_integer_setting(data && data.uhttpd_script_timeout, state.preferences.uhttpd_script_timeout);
+        state.preferences.uhttpd_network_timeout =
+            normalize_integer_setting(data && data.uhttpd_network_timeout, state.preferences.uhttpd_network_timeout);
         state.preferences.home_dir = data && data.home_dir ? String(data.home_dir) : '/tmp/root';
+        if (data && data.web_server) {
+            state.preferences.web_server = String(data.web_server);
+        }
+        if (data && data.nginx_running !== undefined) {
+            state.preferences.nginx_running = data.nginx_running === true || Number(data.nginx_running) === 1;
+        }
+        if (data && data.fcm !== undefined) {
+            state.preferences.fcm = Number(data.fcm) === 1 ? 1 : 0;
+        }
         state.view_mode = value_to_view_mode(state.preferences.view_mode);
     }
 
-    function save_preferences(options, success_message, on_ok) {
-        var payload = {
-            view_mode: options && options.view_mode !== undefined ? options.view_mode : state.preferences.view_mode,
-            allow_system_operations: options && options.allow_system_operations !== undefined ?
-                options.allow_system_operations : state.preferences.allow_system_operations,
-            show_hidden_files: options && options.show_hidden_files !== undefined ?
-                options.show_hidden_files : state.preferences.show_hidden_files,
-            home_dir: options && options.home_dir !== undefined ? options.home_dir : state.preferences.home_dir,
-            enable_thumbnails: options && options.enable_thumbnails !== undefined ?
-                options.enable_thumbnails : state.preferences.enable_thumbnails
-        };
+    function save_preferences(options, success_message, on_ok, on_error) {
+        var section = options && (options.section === 'nginx' || options.section === 'web_server') ? 'web_server' : 'basic';
+        var payload = { section: section };
+        if (section === 'web_server') {
+            payload.uwsgi_request_buffering = options && options.uwsgi_request_buffering !== undefined ?
+                options.uwsgi_request_buffering : state.preferences.uwsgi_request_buffering;
+            payload.client_max_body_size = options && options.client_max_body_size !== undefined ?
+                options.client_max_body_size : state.preferences.client_max_body_size;
+            payload['reload-on-as_enabled'] = options && options['reload-on-as_enabled'] !== undefined ?
+                options['reload-on-as_enabled'] : state.preferences['reload-on-as_enabled'];
+            payload['reload-on-as'] = options && options['reload-on-as'] !== undefined ?
+                options['reload-on-as'] : state.preferences['reload-on-as'];
+            payload['reload-on-rss_enabled'] = options && options['reload-on-rss_enabled'] !== undefined ?
+                options['reload-on-rss_enabled'] : state.preferences['reload-on-rss_enabled'];
+            payload['reload-on-rss'] = options && options['reload-on-rss'] !== undefined ?
+                options['reload-on-rss'] : state.preferences['reload-on-rss'];
+            payload['post-buffering'] = options && options['post-buffering'] !== undefined ?
+                options['post-buffering'] : state.preferences['post-buffering'];
+            payload['limit-as'] = options && options['limit-as'] !== undefined ?
+                options['limit-as'] : state.preferences['limit-as'];
+            payload['reload-mercy'] = options && options['reload-mercy'] !== undefined ?
+                options['reload-mercy'] : state.preferences['reload-mercy'];
+            payload['buffer-size'] = options && options['buffer-size'] !== undefined ?
+                options['buffer-size'] : state.preferences['buffer-size'];
+            payload.uhttpd_script_timeout = options && options.uhttpd_script_timeout !== undefined ?
+                options.uhttpd_script_timeout : state.preferences.uhttpd_script_timeout;
+            payload.uhttpd_network_timeout = options && options.uhttpd_network_timeout !== undefined ?
+                options.uhttpd_network_timeout : state.preferences.uhttpd_network_timeout;
+        } else {
+            payload.view_mode = options && options.view_mode !== undefined ? options.view_mode : state.preferences.view_mode;
+            payload.allow_system_operations = options && options.allow_system_operations !== undefined ?
+                options.allow_system_operations : state.preferences.allow_system_operations;
+            payload.show_hidden_files = options && options.show_hidden_files !== undefined ?
+                options.show_hidden_files : state.preferences.show_hidden_files;
+            payload.home_dir = options && options.home_dir !== undefined ? options.home_dir : state.preferences.home_dir;
+            payload.enable_thumbnails = options && options.enable_thumbnails !== undefined ?
+                options.enable_thumbnails : state.preferences.enable_thumbnails;
+        }
         request_write(api.save_preferences, payload, success_message || '', function(data) {
             apply_preferences(data || payload);
             if (on_ok) {
                 on_ok(data || payload);
             }
-        });
+        }, on_error);
     }
 
     function load_preferences(on_done) {
@@ -3835,6 +4799,111 @@
         document.getElementById('fm_detail_type').textContent = item ? item.display_type : '-';
         document.getElementById('fm_detail_size').textContent = item ? item.display_size : '-';
         document.getElementById('fm_detail_mtime').textContent = item ? item.display_mtime : '-';
+    }
+
+    function ensure_item_hover_card() {
+        if (!state.item_hover_card) {
+            var card = document.createElement('div');
+            card.className = 'fm-item-hover-card';
+            document.body.appendChild(card);
+            state.item_hover_card = card;
+        }
+        return state.item_hover_card;
+    }
+
+    function position_item_hover_card(event) {
+        var card = state.item_hover_card;
+        if (!card || card.style.display !== 'block' || !event) {
+            return;
+        }
+        var left = Number(event.clientX || 0) + 14;
+        var top = Number(event.clientY || 0) + 14;
+        var rect = card.getBoundingClientRect();
+        left = Math.max(8, Math.min(left, window.innerWidth - rect.width - 8));
+        top = Math.max(8, Math.min(top, window.innerHeight - rect.height - 8));
+        card.style.left = left + 'px';
+        card.style.top = top + 'px';
+    }
+
+    function append_item_hover_row(card, label, value) {
+        var row = document.createElement('div');
+        row.className = 'fm-item-hover-row';
+        var label_node = document.createElement('div');
+        label_node.className = 'fm-item-hover-label';
+        label_node.textContent = label;
+        var value_node = document.createElement('div');
+        value_node.className = 'fm-item-hover-value';
+        value_node.textContent = value || '-';
+        row.appendChild(label_node);
+        row.appendChild(value_node);
+        card.appendChild(row);
+    }
+
+    function show_item_hover_card(item, event) {
+        if (!item || state.drag_item || state.selection_dragging) {
+            return;
+        }
+        var card = ensure_item_hover_card();
+        clear_node(card);
+        append_item_hover_row(card, labels.name, item.name);
+        append_item_hover_row(card, labels.type, item.display_type);
+        append_item_hover_row(card, labels.size, item.display_size);
+        append_item_hover_row(card, labels.modified, item.display_mtime);
+        append_item_hover_row(card, labels.path, item.path);
+        card.style.display = 'block';
+        position_item_hover_card(event);
+    }
+
+    function hide_item_hover_card() {
+        if (state.item_hover_timer) {
+            clearTimeout(state.item_hover_timer);
+            state.item_hover_timer = null;
+        }
+        state.item_hover_event = null;
+        if (state.item_hover_card) {
+            state.item_hover_card.style.display = 'none';
+        }
+    }
+
+    function schedule_item_hover_card(item, event) {
+        if (!item || event.pointerType === 'touch') {
+            return;
+        }
+        if (state.item_hover_timer) {
+            clearTimeout(state.item_hover_timer);
+        }
+        state.item_hover_event = {
+            clientX: event.clientX,
+            clientY: event.clientY
+        };
+        state.item_hover_timer = setTimeout(function() {
+            state.item_hover_timer = null;
+            show_item_hover_card(item, state.item_hover_event);
+        }, 1000);
+    }
+
+    function bind_item_hover(node, item) {
+        node.addEventListener('mouseenter', function(event) {
+            schedule_item_hover_card(item, event);
+        });
+        node.addEventListener('mousemove', function(event) {
+            state.item_hover_event = {
+                clientX: event.clientX,
+                clientY: event.clientY
+            };
+            position_item_hover_card(state.item_hover_event);
+        });
+        node.addEventListener('mouseleave', hide_item_hover_card);
+        node.addEventListener('focus', function() {
+            var rect = node.getBoundingClientRect();
+            show_item_hover_card(item, {
+                clientX: rect.left + Math.min(rect.width, 24),
+                clientY: rect.bottom
+            });
+        });
+        node.addEventListener('blur', hide_item_hover_card);
+        node.addEventListener('mousedown', hide_item_hover_card);
+        node.addEventListener('contextmenu', hide_item_hover_card);
     }
 
     function rects_intersect(a, b) {
@@ -4214,7 +5283,6 @@
         var name = document.createElement('div');
         name.className = 'fm-item-name';
         name.textContent = item.name;
-        name.title = item.name;
         var meta = document.createElement('div');
         meta.className = 'fm-item-meta';
         meta.textContent = item.meta || item.path;
@@ -4233,6 +5301,9 @@
         });
         node.addEventListener('click', function(event) { handle_item_click(event, item, node); });
         node.addEventListener('dblclick', function() { open_item(item); });
+        if (kind === 'file' && item.type !== 'directory') {
+            bind_item_hover(node, item);
+        }
         node.addEventListener('contextmenu', function(event) {
             event.preventDefault();
             event.stopPropagation();
@@ -4255,6 +5326,17 @@
             set_button_state('fm_menu_properties', is_multi, is_multi ? labels.multiple_items : '');
             set_button_state('fm_menu_terminal', is_multi, is_multi ? labels.multiple_items : '');
             set_button_state('fm_menu_download', is_multi || item.type === 'directory', is_multi ? labels.multiple_items : '');
+            set_button_state(
+                'fm_menu_compress',
+                !(state.current && state.current.kind === 'directory' && item_list_can_copy(items)) || !!current_write_reason,
+                current_write_reason || ''
+            );
+            document.getElementById('fm_menu_extract').style.display = (!is_multi && is_archive_item(item)) ? 'flex' : 'none';
+            set_button_state(
+                'fm_menu_extract',
+                is_multi || !is_archive_item(item) || !!current_write_reason,
+                is_multi ? labels.multiple_items : (current_write_reason || '')
+            );
             set_button_state('fm_menu_copy', !item_list_can_copy(items), '');
             set_button_state('fm_menu_cut', !item_list_can_modify(items), modify_reason || system_reason);
             document.getElementById('fm_menu_paste').style.display = item.type === 'directory' && has_clipboard() ? 'flex' : 'none';
@@ -4290,6 +5372,7 @@
         if (state.current && state.current.kind === 'directory' && can_modify_item(item)) {
             node.draggable = true;
             node.addEventListener('dragstart', function(event) {
+                hide_item_hover_card();
                 var items = is_item_selected(item) ? selected_items() : [item];
                 state.drag_item = item;
                 state.drag_items = items;
@@ -4393,6 +5476,11 @@
 
     function show_virtual(kind, add_history) {
         state.current = { kind: kind };
+        state.current_directory_data = null;
+        state.sort_path = '';
+        state.sort_field = 'name';
+        state.sort_order = 'asc';
+        hide_item_hover_card();
         clear_selection();
         state.context_item = null;
         var content = document.getElementById('fm_content');
@@ -4419,6 +5507,7 @@
     function prepare_file_item(item) {
         var is_directory = item.type === 'directory';
         var is_package = !is_directory && item.preview === 'package';
+        var is_archive = !is_directory && is_archive_item(item);
         var package_label = is_package ? package_type_label(item.ext) : '';
         return {
             name: item.name,
@@ -4427,7 +5516,7 @@
             ext: item.ext || '',
             preview: item.preview || 'none',
             thumbnail_available: item.thumbnail_available === true,
-            icon_name: is_directory ? 'folder' : (is_package ? String(item.ext || '').toLowerCase() : (item.preview && item.preview !== 'none' ? item.preview : 'file')),
+            icon_name: is_directory ? 'folder' : (is_package ? String(item.ext || '').toLowerCase() : (is_archive ? 'archive' : (item.preview && item.preview !== 'none' ? item.preview : 'file'))),
             is_system: is_directory && is_system_folder(item.path),
             size: Number(item.size || 0),
             meta: is_directory ? labels.folder : (is_package ? package_label : format_size(item.size)),
@@ -4442,11 +5531,119 @@
         if (path === '/') {
             return labels.system_disk;
         }
-        return path.match(/[^/]+$/)[0];
+        for (var i = 0; i < state.navigation.quick_access.length; i++) {
+            if (state.navigation.quick_access[i].path === path) {
+                return state.navigation.quick_access[i].name;
+            }
+        }
+        var match = String(path || '').match(/[^/]+$/);
+        return match ? match[0] : path;
+    }
+
+    function sort_text_value(value) {
+        return String(value || '').toLowerCase();
+    }
+
+    function compare_file_name(a, b) {
+        var result = sort_text_value(a.name).localeCompare(sort_text_value(b.name));
+        if (result !== 0) {
+            return result;
+        }
+        return String(a.path || '').localeCompare(String(b.path || ''));
+    }
+
+    function compare_sort_field(a, b, field) {
+        if (field === 'mtime') {
+            return Number(a.mtime || 0) - Number(b.mtime || 0);
+        }
+        if (field === 'size') {
+            return Number(a.size || 0) - Number(b.size || 0);
+        }
+        if (field === 'type') {
+            return sort_text_value(a.display_type).localeCompare(sort_text_value(b.display_type));
+        }
+        return compare_file_name(a, b);
+    }
+
+    function sorted_directory_items(items, path) {
+        var output = (items || []).slice();
+        if (state.sort_path !== path) {
+            return output;
+        }
+        var field = state.sort_field;
+        var order = state.sort_order;
+        output.sort(function(a, b) {
+            var result;
+            if (field !== 'name' && a.type !== b.type) {
+                return a.type === 'directory' ? -1 : 1;
+            } else if (field !== 'name' && a.type === 'directory' && b.type === 'directory') {
+                return compare_file_name(a, b);
+            } else {
+                result = compare_sort_field(a, b, field);
+                if (result === 0) {
+                    return compare_file_name(a, b);
+                }
+            }
+            return order === 'desc' ? -result : result;
+        });
+        return output;
+    }
+
+    function restore_rendered_selection(paths) {
+        var selected = [];
+        var by_path = {};
+        rendered_file_items().forEach(function(entry) {
+            by_path[entry.item.path] = entry.item;
+        });
+        (paths || []).forEach(function(path) {
+            if (by_path[path]) {
+                selected.push(by_path[path]);
+            }
+        });
+        set_selected_items(selected, selected.length ? selected[selected.length - 1] : null, selected.length ? selected[0] : null);
+    }
+
+    function rerender_current_directory() {
+        if (!state.current_directory_data || !state.current || state.current.kind !== 'directory') {
+            return;
+        }
+        var selected_paths = state.selected_order.slice();
+        render_directory(state.current_directory_data);
+        restore_rendered_selection(selected_paths);
+    }
+
+    function update_sort_menu_state() {
+        var active_field = state.sort_path === (state.current && state.current.path) ? state.sort_field : 'name';
+        var active_order = state.sort_path === (state.current && state.current.path) ? state.sort_order : 'asc';
+        var field_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-field]');
+        for (var i = 0; i < field_buttons.length; i++) {
+            field_buttons[i].classList.toggle('active', field_buttons[i].getAttribute('data-sort-field') === active_field);
+        }
+        var order_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-order]');
+        for (var j = 0; j < order_buttons.length; j++) {
+            order_buttons[j].classList.toggle('active', order_buttons[j].getAttribute('data-sort-order') === active_order);
+        }
+    }
+
+    function apply_directory_sort(field, order) {
+        if (!state.current || state.current.kind !== 'directory') {
+            return;
+        }
+        state.sort_path = state.current.path;
+        if (field) {
+            state.sort_field = field;
+        }
+        if (order) {
+            state.sort_order = order;
+        }
+        update_sort_menu_state();
+        hide_context_menus();
+        rerender_current_directory();
     }
 
     function render_directory(data) {
         var content = document.getElementById('fm_content');
+        hide_item_hover_card();
         clear_node(content);
         var header = document.createElement('div');
         header.className = 'fm-page-header';
@@ -4454,7 +5651,7 @@
         title.className = 'fm-page-title';
         title.textContent = path_title(data.path);
         header.appendChild(title);
-        var items = (data.items || []).map(prepare_file_item);
+        var items = sorted_directory_items((data.items || []).map(prepare_file_item), data.path);
         var image_count = items.filter(function(item) { return item.preview === 'image'; }).length;
         if (state.preferences.enable_thumbnails === 1 && image_count > 0) {
             var actions = document.createElement('div');
@@ -4672,7 +5869,7 @@
     }
 
     function localized_space_message(message) {
-        return String(message || '').indexOf('50MB') >= 0 ? labels.space_less_than_50mb : message;
+        return String(message || '').indexOf('5%') >= 0 ? labels.space_less_than_50mb : message;
     }
 
     function set_upload_panel(title, detail, percent, class_name, uploaded_bytes, total_bytes) {
@@ -4830,9 +6027,7 @@
             state.uploading = false;
             update_toolbar();
             set_upload_panel(labels.upload_complete, batch.files.length + ' ' + labels.file, 100, 'success', batch.total_size, batch.total_size);
-            if (state.current && state.current.kind === 'directory' && state.current.path === batch.target_dir) {
-                open_path(batch.target_dir, false);
-            }
+            refresh_after_write();
             return;
         }
 
@@ -4965,20 +6160,133 @@
         refresh_current();
         if (persist !== false) {
             state.preferences.view_mode = view_mode_to_value(mode);
-            save_preferences({ view_mode: state.preferences.view_mode });
+            save_preferences({ section: 'basic', view_mode: state.preferences.view_mode });
         }
     }
 
-    function open_settings_dialog() {
+    function set_settings_tab(tab) {
+        var next_tab = tab === 'nginx' ? 'nginx' : 'basic';
+        var tabs = document.querySelectorAll('[data-settings-tab]');
+        for (var i = 0; i < tabs.length; i++) {
+            var active = tabs[i].getAttribute('data-settings-tab') === next_tab;
+            tabs[i].classList.toggle('active', active);
+            tabs[i].setAttribute('aria-selected', active ? 'true' : 'false');
+        }
+        document.getElementById('fm_settings_panel_basic').classList.toggle('active', next_tab === 'basic');
+        document.getElementById('fm_settings_panel_nginx').classList.toggle('active', next_tab === 'nginx');
+    }
+
+    function render_nginx_settings() {
+        var web_server = state.preferences.web_server || 'unknown';
+        var running = state.preferences.nginx_running === true || web_server === 'nginx';
+        var uhttpd_running = !running && web_server === 'uhttpd';
+        var title = document.getElementById('fm_web_server_title');
+        var status = document.getElementById('fm_nginx_status');
+        var install = document.getElementById('fm_nginx_install');
+        var options = document.getElementById('fm_nginx_options');
+        var uhttpd_options = document.getElementById('fm_uhttpd_options');
+        var actions = document.getElementById('fm_nginx_page_actions');
+        var fcm_note = document.getElementById('fm_nginx_fcm_note');
+        title.textContent = 'Nginx';
+        status.textContent = running ? labels.installed : labels.not_installed;
+        status.style.display = 'inline-flex';
+        status.classList.toggle('checking', false);
+        install.style.display = running ? 'none' : 'inline-flex';
+        options.style.display = running ? 'block' : 'none';
+        uhttpd_options.style.display = uhttpd_running ? 'block' : 'none';
+        actions.style.display = running || uhttpd_running ? 'flex' : 'none';
+        fcm_note.style.display = !running && state.preferences.fcm === 1 ? 'block' : 'none';
+    }
+
+    function refresh_nginx_settings() {
+        var status = document.getElementById('fm_nginx_status');
+        status.textContent = labels.checking;
+        status.style.display = 'inline-flex';
+        status.classList.toggle('checking', true);
+        document.getElementById('fm_nginx_install').style.display = 'none';
+        document.getElementById('fm_uhttpd_options').style.display = 'none';
+        document.getElementById('fm_nginx_fcm_note').style.display = 'none';
+        $.ajax({
+            url: api.preferences,
+            type: 'GET',
+            data: { _: Date.now() },
+            dataType: 'json',
+            success: function(res) {
+                if (res && res.code === 0) {
+                    apply_preferences(res.data || {});
+                }
+                render_nginx_settings();
+            },
+            error: render_nginx_settings
+        });
+    }
+
+    function form_integer_value(id, fallback) {
+        var value = $.trim(document.getElementById(id).value || '');
+        return value === '' ? fallback : normalize_integer_setting(value, fallback);
+    }
+
+    function render_nginx_body_size_unit() {
+        var value = form_integer_value(
+            'fm_settings_client_max_body_size',
+            state.preferences.client_max_body_size
+        );
+        document.getElementById('fm_client_max_body_size_unit').textContent =
+            value === 0 ? labels.unlimited : 'M';
+    }
+
+    function sync_uwsgi_toggle_inputs() {
+        document.getElementById('fm_settings_reload_on_as').disabled =
+            !document.getElementById('fm_settings_reload_on_as_enabled').checked;
+        document.getElementById('fm_settings_reload_on_rss').disabled =
+            !document.getElementById('fm_settings_reload_on_rss_enabled').checked;
+    }
+
+    function populate_settings_dialog() {
         document.getElementById('fm_settings_view_mode').value = String(state.preferences.view_mode);
         document.getElementById('fm_settings_home_dir').value = state.preferences.home_dir || '/tmp/root';
         document.getElementById('fm_settings_system_operations').checked = state.preferences.allow_system_operations === 1;
         document.getElementById('fm_settings_show_hidden').checked = state.preferences.show_hidden_files === 1;
         document.getElementById('fm_settings_thumbnails').checked = state.preferences.enable_thumbnails === 1;
-        open_modal('fm_settings_dialog');
+        document.getElementById('fm_settings_uwsgi_request_buffering').checked =
+            state.preferences.uwsgi_request_buffering === 1;
+        document.getElementById('fm_settings_client_max_body_size').value =
+            String(state.preferences.client_max_body_size);
+        document.getElementById('fm_settings_reload_on_as_enabled').checked =
+            state.preferences['reload-on-as_enabled'] === 1;
+        document.getElementById('fm_settings_reload_on_as').value =
+            String(state.preferences['reload-on-as']);
+        document.getElementById('fm_settings_reload_on_rss_enabled').checked =
+            state.preferences['reload-on-rss_enabled'] === 1;
+        document.getElementById('fm_settings_reload_on_rss').value =
+            String(state.preferences['reload-on-rss']);
+        document.getElementById('fm_settings_post_buffering').value =
+            String(state.preferences['post-buffering']);
+        document.getElementById('fm_settings_limit_as').value =
+            String(state.preferences['limit-as']);
+        document.getElementById('fm_settings_reload_mercy').value =
+            String(state.preferences['reload-mercy']);
+        document.getElementById('fm_settings_buffer_size').value =
+            String(state.preferences['buffer-size']);
+        document.getElementById('fm_settings_uhttpd_script_timeout').value =
+            String(state.preferences.uhttpd_script_timeout);
+        document.getElementById('fm_settings_uhttpd_network_timeout').value =
+            String(state.preferences.uhttpd_network_timeout);
+        render_nginx_body_size_unit();
+        sync_uwsgi_toggle_inputs();
     }
 
-    function save_settings_dialog() {
+    function open_settings_dialog() {
+        load_preferences(function() {
+            populate_settings_dialog();
+            set_settings_tab('basic');
+            render_nginx_settings();
+            open_modal('fm_settings_dialog');
+            refresh_nginx_settings();
+        });
+    }
+
+    function save_basic_settings_dialog() {
         var next_view_mode = Number(document.getElementById('fm_settings_view_mode').value);
         var next_home_dir = $.trim(document.getElementById('fm_settings_home_dir').value || '') || '/tmp/root';
         var next_system_operations = document.getElementById('fm_settings_system_operations').checked ? 1 : 0;
@@ -4989,6 +6297,7 @@
             return;
         }
         save_preferences({
+            section: 'basic',
             view_mode: next_view_mode,
             home_dir: next_home_dir,
             show_hidden_files: next_show_hidden,
@@ -4998,6 +6307,176 @@
             close_modal();
             apply_preferences(data);
             refresh_navigation(refresh_current);
+        });
+    }
+
+    function save_uhttpd_settings_dialog() {
+        var button = document.getElementById('fm_settings_nginx_save');
+        var script_timeout = form_integer_value(
+            'fm_settings_uhttpd_script_timeout',
+            state.preferences.uhttpd_script_timeout
+        );
+        var network_timeout = form_integer_value(
+            'fm_settings_uhttpd_network_timeout',
+            state.preferences.uhttpd_network_timeout
+        );
+        button.disabled = true;
+        save_preferences({
+            section: 'web_server',
+            uhttpd_script_timeout: script_timeout,
+            uhttpd_network_timeout: network_timeout
+        }, labels.web_server_settings_saved, function(data) {
+            button.disabled = false;
+            close_modal();
+            apply_preferences(data || {});
+        }, function() {
+            button.disabled = false;
+        });
+    }
+
+    function save_nginx_settings_dialog() {
+        var button = document.getElementById('fm_settings_nginx_save');
+        var buffering = document.getElementById('fm_settings_uwsgi_request_buffering').checked ? 1 : 0;
+        var body_size = form_integer_value(
+            'fm_settings_client_max_body_size',
+            state.preferences.client_max_body_size
+        );
+        var reload_on_as = form_integer_value('fm_settings_reload_on_as', state.preferences['reload-on-as']);
+        var reload_on_rss = form_integer_value('fm_settings_reload_on_rss', state.preferences['reload-on-rss']);
+        var post_buffering = form_integer_value('fm_settings_post_buffering', state.preferences['post-buffering']);
+        var limit_as = form_integer_value('fm_settings_limit_as', state.preferences['limit-as']);
+        var reload_mercy = form_integer_value('fm_settings_reload_mercy', state.preferences['reload-mercy']);
+        var buffer_size = form_integer_value('fm_settings_buffer_size', state.preferences['buffer-size']);
+        body_size = Math.max(0, Math.min(1024, body_size));
+        if (state.preferences.nginx_running !== true) {
+            open_nginx_install_confirm();
+            return;
+        }
+        button.disabled = true;
+        save_preferences({
+            section: 'web_server',
+            uwsgi_request_buffering: buffering,
+            client_max_body_size: body_size,
+            'reload-on-as_enabled': document.getElementById('fm_settings_reload_on_as_enabled').checked ? 1 : 0,
+            'reload-on-as': reload_on_as,
+            'reload-on-rss_enabled': document.getElementById('fm_settings_reload_on_rss_enabled').checked ? 1 : 0,
+            'reload-on-rss': reload_on_rss,
+            'post-buffering': post_buffering,
+            'limit-as': limit_as,
+            'reload-mercy': reload_mercy,
+            'buffer-size': buffer_size
+        }, labels.nginx_settings_saved, function(data) {
+            button.disabled = false;
+            close_modal();
+            apply_preferences(data || {});
+        }, function() {
+            button.disabled = false;
+        });
+    }
+
+    function save_web_server_settings_dialog() {
+        if (state.preferences.web_server === 'uhttpd' && state.preferences.nginx_running !== true) {
+            save_uhttpd_settings_dialog();
+            return;
+        }
+        save_nginx_settings_dialog();
+    }
+
+    function use_recommended_nginx_settings() {
+        document.getElementById('fm_settings_client_max_body_size').value = '0';
+        document.getElementById('fm_settings_uwsgi_request_buffering').checked = false;
+        document.getElementById('fm_settings_reload_on_as_enabled').checked = false;
+        document.getElementById('fm_settings_reload_on_as').value = '256';
+        document.getElementById('fm_settings_reload_on_rss_enabled').checked = false;
+        document.getElementById('fm_settings_reload_on_rss').value = '192';
+        document.getElementById('fm_settings_limit_as').value = '16000';
+        document.getElementById('fm_settings_post_buffering').value = '0';
+        document.getElementById('fm_settings_reload_mercy').value = '16';
+        document.getElementById('fm_settings_buffer_size').value = '10000';
+        render_nginx_body_size_unit();
+        sync_uwsgi_toggle_inputs();
+        save_nginx_settings_dialog();
+    }
+
+    function open_nginx_install_confirm() {
+        close_modal();
+        document.getElementById('fm_nginx_confirm_start').disabled = false;
+        open_modal('fm_nginx_confirm_dialog');
+    }
+
+    function stop_nginx_install_timers() {
+        if (state.nginx_install_countdown_timer) {
+            clearTimeout(state.nginx_install_countdown_timer);
+            state.nginx_install_countdown_timer = null;
+        }
+    }
+
+    function nginx_https_url() {
+        var hostname = window.location.hostname || window.location.host;
+        if (hostname.indexOf(':') >= 0 && hostname.charAt(0) !== '[') {
+            hostname = '[' + hostname + ']';
+        }
+        return 'https://' + hostname + '/';
+    }
+
+    function begin_nginx_restart_countdown() {
+        if (state.nginx_install_countdown_timer) {
+            return;
+        }
+        document.getElementById('fm_nginx_spinner').style.display = 'block';
+        document.getElementById('fm_nginx_install_actions').style.display = 'none';
+        var seconds = 60;
+        var tick = function() {
+            document.getElementById('fm_nginx_install_text').textContent =
+                format_label(labels.nginx_restart_countdown, seconds);
+            if (seconds <= 0) {
+                state.nginx_install_countdown_timer = null;
+                window.location.replace(nginx_https_url());
+                return;
+            }
+            seconds--;
+            state.nginx_install_countdown_timer = setTimeout(tick, 1000);
+        };
+        tick();
+    }
+
+    function fail_nginx_install(message) {
+        stop_nginx_install_timers();
+        state.nginx_installing = false;
+        document.getElementById('fm_nginx_spinner').style.display = 'none';
+        document.getElementById('fm_nginx_install_text').textContent =
+            message || labels.nginx_install_failed;
+        document.getElementById('fm_nginx_install_actions').style.display = 'flex';
+        set_error_status(message || labels.nginx_install_failed);
+    }
+
+    function start_nginx_install() {
+        var button = document.getElementById('fm_nginx_confirm_start');
+        button.disabled = true;
+        close_modal();
+        stop_nginx_install_timers();
+        state.nginx_installing = true;
+        state.nginx_install_task = null;
+        document.getElementById('fm_nginx_spinner').style.display = 'block';
+        document.getElementById('fm_nginx_install_text').textContent = labels.installing_nginx;
+        document.getElementById('fm_nginx_install_actions').style.display = 'none';
+        open_modal('fm_nginx_install_dialog');
+        begin_nginx_restart_countdown();
+        $.ajax({
+            url: api.nginx_install_start,
+            type: 'POST',
+            dataType: 'json',
+            success: function(res) {
+                if (!res || res.code !== 0) {
+                    button.disabled = false;
+                    fail_nginx_install((res && res.message) || labels.nginx_install_failed);
+                    return;
+                }
+                state.nginx_install_task = res.data || {};
+            },
+            error: function(xhr) {
+                state.nginx_install_task = null;
+            }
         });
     }
 
@@ -5182,14 +6661,14 @@
     }
 
     function hide_context_menus() {
+        hide_item_hover_card();
         document.getElementById('fm_item_menu').style.display = 'none';
         document.getElementById('fm_blank_menu').style.display = 'none';
         document.getElementById('fm_view_menu').style.display = 'none';
+        document.getElementById('fm_sort_menu').style.display = 'none';
     }
 
-    function show_context_menu(id, x, y) {
-        hide_context_menus();
-        var menu = document.getElementById(id);
+    function position_context_menu(menu, x, y) {
         menu.style.display = 'block';
         var rect = menu.getBoundingClientRect();
         var left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
@@ -5198,7 +6677,35 @@
         menu.style.top = top + 'px';
     }
 
+    function show_context_menu(id, x, y) {
+        hide_context_menus();
+        position_context_menu(document.getElementById(id), x, y);
+    }
+
+    function show_sort_menu() {
+        var button = document.getElementById('fm_menu_sort');
+        if (button.disabled || !state.current || state.current.kind !== 'directory') {
+            return;
+        }
+        update_sort_menu_state();
+        var rect = button.getBoundingClientRect();
+        var menu = document.getElementById('fm_sort_menu');
+        var x = rect.right + 2;
+        var y = rect.top;
+        menu.style.display = 'block';
+        var menu_rect = menu.getBoundingClientRect();
+        if (x + menu_rect.width > window.innerWidth - 8) {
+            x = rect.left - menu_rect.width - 2;
+        }
+        if (y + menu_rect.height > window.innerHeight - 8) {
+            y = window.innerHeight - menu_rect.height - 8;
+        }
+        menu.style.left = Math.max(8, x) + 'px';
+        menu.style.top = Math.max(8, y) + 'px';
+    }
+
     function open_modal(id) {
+        hide_item_hover_card();
         document.getElementById('fm_modal_mask').style.display = 'block';
         document.getElementById(id).style.display =
             (id === 'fm_video_dialog' || id === 'fm_terminal_dialog' || id === 'fm_text_dialog' || id === 'fm_binary_dialog' || id === 'fm_pdf_dialog') ? 'flex' : 'block';
@@ -5216,15 +6723,17 @@
         var error = document.getElementById('fm_terminal_error');
         document.getElementById('fm_terminal_loading_text').textContent = message || labels.connecting_terminal;
         document.getElementById('fm_terminal_loading_hint').textContent = hint || '';
+        document.getElementById('fm_terminal_install_tool').style.display = 'none';
         loading.classList.add('show');
         error.classList.remove('show');
     }
 
-    function set_terminal_error(message, hint) {
+    function set_terminal_error(message, hint, show_install) {
         var loading = document.getElementById('fm_terminal_loading');
         var error = document.getElementById('fm_terminal_error');
         document.getElementById('fm_terminal_error_text').textContent = message || labels.terminal_failed;
         document.getElementById('fm_terminal_error_hint').textContent = hint || labels.terminal_failed_hint;
+        document.getElementById('fm_terminal_install_tool').style.display = show_install ? 'inline-flex' : 'none';
         loading.classList.remove('show');
         error.classList.add('show');
         state.terminal_ready = false;
@@ -5243,6 +6752,7 @@
         document.getElementById('fm_terminal_loading').classList.remove('show');
         document.getElementById('fm_terminal_error').classList.remove('show');
         document.getElementById('fm_terminal_loading_hint').textContent = '';
+        document.getElementById('fm_terminal_install_tool').style.display = 'none';
         state.terminal_context = null;
     }
 
@@ -5317,7 +6827,7 @@
             success: function(res) {
                 var data = res && res.code === 0 ? (res.data || {}) : null;
                 if (!data || !data.available) {
-                    set_terminal_error(labels.terminal_failed, labels.terminal_service_missing);
+                    set_terminal_error(labels.terminal_failed, labels.terminal_service_missing, true);
                     set_error_status((res && res.message) || labels.terminal_service_missing);
                     return;
                 }
@@ -5342,12 +6852,20 @@
     }
 
     function close_modal() {
+        if (state.nginx_installing &&
+                document.getElementById('fm_nginx_install_dialog').style.display === 'block') {
+            return;
+        }
         if (state.install_task && !state.install_task.done &&
                 document.getElementById('fm_package_install_dialog').style.display !== 'none') {
             return;
         }
         if (state.thumbnail_task && !state.thumbnail_task.done &&
                 document.getElementById('fm_thumbnail_dialog').style.display !== 'none') {
+            return;
+        }
+        if (state.archive_task && !state.archive_task.done &&
+                document.getElementById('fm_archive_task_dialog').style.display !== 'none') {
             return;
         }
         if (state.text_saving && is_text_dialog_open()) {
@@ -5401,12 +6919,15 @@
         }
         stop_install_poll();
         stop_thumbnail_poll();
+        stop_archive_poll();
         state.name_action = null;
         state.delete_item = null;
         state.delete_items = [];
         state.transfer_action = null;
         state.install_item = null;
         state.install_task = null;
+        state.archive_items = [];
+        state.archive_task = null;
         state.thumbnail_task = null;
         state.thumbnail_path = '';
     }
@@ -5657,12 +7178,6 @@
         node.textContent = (waiting ? labels.buffering : labels.buffered) + ': ' + Math.round(percent) + '%';
     }
 
-    function refresh_video_log() {
-        request_json(api.video_log, {}, function(data) {
-            document.getElementById('fm_video_log').textContent = data.content || '<%:No diagnostic log%>';
-        });
-    }
-
     function open_video(item) {
         var video = document.getElementById('fm_video_content');
         var error = document.getElementById('fm_video_error');
@@ -5670,16 +7185,47 @@
         document.getElementById('fm_video_path').textContent = item.path;
         document.getElementById('fm_video_size').textContent = item.display_size;
         document.getElementById('fm_video_buffer').textContent = labels.buffered + ': 0%';
+        var hint = document.getElementById('fm_video_range_hint');
+        error.textContent = labels.video_format_error;
         error.style.display = 'none';
-        video.onerror = function() { error.style.display = 'block'; };
+        hint.style.display = 'none';
+        video.onerror = function() {
+            var err = video.error;
+            error.textContent = labels.video_format_error + (err ? ' [code=' + err.code + (err.message ? ' ' + err.message : '') + ']' : '');
+            error.style.display = 'block';
+        };
         video.onprogress = function() { update_video_buffer(video, false); };
         video.onloadedmetadata = function() { update_video_buffer(video, false); };
         video.onloadeddata = function() { error.style.display = 'none'; };
         video.oncanplay = function() { update_video_buffer(video, false); };
         video.onwaiting = function() { update_video_buffer(video, true); };
-        video.src = api.video + '?path=' + encodeURIComponent(item.path) + '&v=' + encodeURIComponent(item.mtime || 0) + '&stream=4';
         open_modal('fm_video_dialog');
-        video.load();
+        var start_playback = function() {
+            video.src = api.video + '?path=' + encodeURIComponent(item.path) + '&v=' + encodeURIComponent(item.mtime || 0) + '&stream=4';
+            video.load();
+        };
+        $.ajax({
+            url: api.video_check,
+            type: 'GET',
+            data: { path: item.path },
+            dataType: 'json',
+            headers: { 'Range': 'bytes=0-0' },
+            success: function(res) {
+                var info = res && res.data ? res.data : null;
+                if (info && !info.playable) {
+                    error.textContent = labels.video_no_range;
+                    error.style.display = 'block';
+                    return;
+                }
+                if (info && !info.range_supported) {
+                    hint.style.display = '';
+                }
+                start_playback();
+            },
+            error: function() {
+                start_playback();
+            }
+        });
     }
 
     function stop_install_poll() {
@@ -5883,6 +7429,50 @@
         });
     }
 
+    function start_terminal_tool_install() {
+        close_modal();
+        state.install_item = {
+            name: 'ttyd',
+            path: 'ttyd',
+            ext: 'repository'
+        };
+        update_package_install_view({
+            state: 'running',
+            done: false,
+            success: false,
+            message: labels.install_running,
+            package_type: 'repository',
+            package_name: 'ttyd',
+            path: 'ttyd',
+            log: labels.no_log_yet
+        });
+        open_modal('fm_package_install_dialog');
+        request_write(api.terminal_tool_install_start, {}, '', function(data) {
+            state.install_item = {
+                name: data.package_name || 'ttyd',
+                path: data.package_name || 'ttyd',
+                ext: 'repository'
+            };
+            update_package_install_view(data || {});
+            open_modal('fm_package_install_dialog');
+            if (data.task_id && !data.done) {
+                poll_package_install(data.task_id);
+            }
+        }, function(message) {
+            update_package_install_view({
+                state: 'failed',
+                done: true,
+                success: false,
+                message: message || labels.install_failed,
+                package_type: 'repository',
+                package_name: 'ttyd',
+                path: 'ttyd',
+                exit_code: -1,
+                log: message || labels.install_failed
+            });
+        });
+    }
+
     function open_item(item) {
         hide_context_menus();
         if (!item) {
@@ -5917,7 +7507,9 @@
 
     function refresh_current() {
         if (state.current && state.current.kind === 'directory') {
-            open_path(state.current.path, false);
+            refresh_navigation(function() {
+                open_path(state.current.path, false);
+            });
             return;
         }
         refresh_navigation(function() {
@@ -5927,6 +7519,11 @@
 
     function open_path(path, add_history, select_path) {
         request_json(api.list, { path: path }, function(data) {
+            if (state.sort_path && state.sort_path !== data.path) {
+                state.sort_path = '';
+                state.sort_field = 'name';
+                state.sort_order = 'asc';
+            }
             state.current = {
                 kind: 'directory',
                 path: data.path,
@@ -5935,6 +7532,7 @@
                 operation_space_margin: Number(data.operation_space_margin || 0),
                 has_operation_space: data.has_operation_space !== false
             };
+            state.current_directory_data = data;
             clear_selection();
             state.context_item = null;
             render_directory(data);
@@ -6053,6 +7651,31 @@
             set_view_mode(this.getAttribute('data-view'));
         });
     }
+    document.getElementById('fm_menu_sort').addEventListener('mouseenter', show_sort_menu);
+    document.getElementById('fm_menu_sort').addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        show_sort_menu();
+    });
+    document.getElementById('fm_blank_menu').addEventListener('mousemove', function(event) {
+        if (!event.target.closest('#fm_menu_sort')) {
+            document.getElementById('fm_sort_menu').style.display = 'none';
+        }
+    });
+    var sort_field_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-field]');
+    for (var sort_field_index = 0; sort_field_index < sort_field_buttons.length; sort_field_index++) {
+        sort_field_buttons[sort_field_index].addEventListener('click', function(event) {
+            event.stopPropagation();
+            apply_directory_sort(this.getAttribute('data-sort-field'), null);
+        });
+    }
+    var sort_order_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-order]');
+    for (var sort_order_index = 0; sort_order_index < sort_order_buttons.length; sort_order_index++) {
+        sort_order_buttons[sort_order_index].addEventListener('click', function(event) {
+            event.stopPropagation();
+            apply_directory_sort(null, this.getAttribute('data-sort-order'));
+        });
+    }
     document.getElementById('fm_upload_input').addEventListener('change', function() {
         var files = Array.prototype.slice.call(this.files || []);
         var target = state.upload_target;
@@ -6065,11 +7688,25 @@
     document.getElementById('fm_overwrite_cancel').addEventListener('click', close_modal);
     document.getElementById('fm_name_cancel').addEventListener('click', close_modal);
     document.getElementById('fm_delete_cancel').addEventListener('click', close_modal);
-    document.getElementById('fm_settings_cancel').addEventListener('click', close_modal);
+    document.getElementById('fm_settings_basic_cancel').addEventListener('click', close_modal);
+    document.getElementById('fm_settings_nginx_cancel').addEventListener('click', close_modal);
+    document.getElementById('fm_nginx_confirm_cancel').addEventListener('click', close_modal);
+    document.getElementById('fm_nginx_install_done').addEventListener('click', close_modal);
     document.getElementById('fm_package_confirm_cancel').addEventListener('click', close_modal);
     document.getElementById('fm_package_install_done').addEventListener('click', close_modal);
+    document.getElementById('fm_archive_cancel').addEventListener('click', close_modal);
+    document.getElementById('fm_archive_task_done').addEventListener('click', close_modal);
+    document.getElementById('fm_archive_format').addEventListener('change', sync_archive_format_options);
+    document.getElementById('fm_archive_start').addEventListener('click', submit_archive_dialog);
+    document.getElementById('fm_archive_name').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            submit_archive_dialog();
+        }
+    });
     document.getElementById('fm_thumbnail_done').addEventListener('click', close_modal);
     document.getElementById('fm_thumbnail_install_tool').addEventListener('click', start_thumbnail_tool_install);
+    document.getElementById('fm_terminal_install_tool').addEventListener('click', start_terminal_tool_install);
     document.getElementById('fm_text_close').addEventListener('click', close_modal);
     document.getElementById('fm_binary_close').addEventListener('click', close_modal);
     document.getElementById('fm_binary_load').addEventListener('click', load_binary_range);
@@ -6091,7 +7728,20 @@
             start_package_install(state.install_item);
         }
     });
-    document.getElementById('fm_settings_save').addEventListener('click', save_settings_dialog);
+    document.getElementById('fm_settings_basic_save').addEventListener('click', save_basic_settings_dialog);
+    document.getElementById('fm_settings_nginx_save').addEventListener('click', save_web_server_settings_dialog);
+    document.getElementById('fm_nginx_recommend').addEventListener('click', use_recommended_nginx_settings);
+    document.getElementById('fm_nginx_install').addEventListener('click', open_nginx_install_confirm);
+    document.getElementById('fm_nginx_confirm_start').addEventListener('click', start_nginx_install);
+    document.getElementById('fm_settings_client_max_body_size').addEventListener('input', render_nginx_body_size_unit);
+    document.getElementById('fm_settings_reload_on_as_enabled').addEventListener('change', sync_uwsgi_toggle_inputs);
+    document.getElementById('fm_settings_reload_on_rss_enabled').addEventListener('change', sync_uwsgi_toggle_inputs);
+    var settings_tabs = document.querySelectorAll('[data-settings-tab]');
+    for (var settings_tab_index = 0; settings_tab_index < settings_tabs.length; settings_tab_index++) {
+        settings_tabs[settings_tab_index].addEventListener('click', function() {
+            set_settings_tab(this.getAttribute('data-settings-tab'));
+        });
+    }
     document.getElementById('fm_overwrite_confirm').addEventListener('click', function() {
         var batch = state.pending_upload;
         state.pending_upload = null;
@@ -6117,6 +7767,16 @@
     document.getElementById('fm_menu_download').addEventListener('click', function() {
         hide_context_menus();
         trigger_download(state.context_item);
+    });
+    document.getElementById('fm_menu_compress').addEventListener('click', function() {
+        var items = context_selection(state.context_item);
+        hide_context_menus();
+        open_archive_dialog(items);
+    });
+    document.getElementById('fm_menu_extract').addEventListener('click', function() {
+        var item = state.context_item;
+        hide_context_menus();
+        start_archive_extract(item);
     });
     document.getElementById('fm_menu_copy').addEventListener('click', function() {
         hide_context_menus();
@@ -6235,7 +7895,6 @@
             load_target_directory(state.target_parent || '/');
         }
     });
-    document.getElementById('fm_video_log_refresh').addEventListener('click', refresh_video_log);
     document.getElementById('fm_content').addEventListener('mousedown', start_marquee_selection);
     document.getElementById('fm_content').addEventListener('contextmenu', function(event) {
         if (event.target.closest('.fm-item')) {
@@ -6246,6 +7905,8 @@
         var writable_page = state.current && state.current.kind === 'directory';
         var current_path = writable_page ? state.current.path : '';
         var system_reason = get_write_block_reason(current_path);
+        set_button_state('fm_menu_sort', !writable_page, '');
+        update_sort_menu_state();
         set_button_state(
             'fm_menu_new_folder',
             !writable_page || !!get_write_block_reason(current_path),
@@ -6319,7 +7980,10 @@
             set_warning_status(state.uploading ? labels.upload_busy : labels.select_upload_target);
         }
     });
-    window.addEventListener('scroll', hide_context_menus, true);
+    window.addEventListener('scroll', function() {
+        hide_item_hover_card();
+        hide_context_menus();
+    }, true);
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             hide_context_menus();

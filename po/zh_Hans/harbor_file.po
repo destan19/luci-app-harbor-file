@@ -154,8 +154,8 @@ msgstr "暂不支持上传文件夹"
 msgid "Not enough free space"
 msgstr "可用空间不足"
 
-msgid "Available space is less than 50MB, operation is not allowed"
-msgstr "可用空间不足50MB，无法操作"
+msgid "Available space is less than 5% of the current partition, operation is not allowed"
+msgstr "可用空间不足当前分区的5%，无法操作"
 
 msgid "A directory or special file already uses this name"
 msgstr "同名目录或特殊文件已存在"
@@ -168,6 +168,15 @@ msgstr "共"
 
 msgid "New folder"
 msgstr "新建文件夹"
+
+msgid "Sort by"
+msgstr "排序方式"
+
+msgid "Ascending"
+msgstr "递增"
+
+msgid "Descending"
+msgstr "递减"
 
 msgid "Folder name"
 msgstr "文件夹名称"
@@ -216,15 +225,6 @@ msgstr "已缓存"
 
 msgid "Buffering"
 msgstr "正在缓存"
-
-msgid "Video diagnostics"
-msgstr "视频加载诊断"
-
-msgid "Refresh log"
-msgstr "刷新日志"
-
-msgid "No diagnostic log"
-msgstr "暂无诊断日志"
 
 msgid "View"
 msgstr "查看"
@@ -601,3 +601,222 @@ msgstr "网站"
 
 msgid "All rights reserved."
 msgstr "保留所有权利。"
+
+msgid "A high-performance web server that improves video playback and file operation performance."
+msgstr "一款高性能的Web服务器，提升视频播放、文件操作性能。"
+
+msgid "This system is FanchmWrt. The default web server has already been optimized for basic file management and video playback, so switching to Nginx is not required."
+msgstr "该系统为FanchmWrt，已经对默认Web服务器进行了优化，满足了基本的文件管理和视频播放，无需切换为Nginx服务器。"
+
+msgid "Checking"
+msgstr "检测中"
+
+msgid "Installed"
+msgstr "已安装"
+
+msgid "Not installed"
+msgstr "未安装"
+
+msgid "Settings categories"
+msgstr "设置分类"
+
+msgid "Basic settings"
+msgstr "基本设置"
+
+msgid "Web service"
+msgstr "Web服务"
+
+msgid "Web service configuration saved"
+msgstr "Web服务配置已保存"
+
+msgid "Nginx configuration"
+msgstr "Nginx配置"
+
+msgid "Use recommended configuration"
+msgstr "一键使用推荐配置"
+
+msgid "Default configuration may keep upload and download limits. Recommended configuration can remove some limits."
+msgstr "默认配置会存在文件上传下载限制，使用推荐配置可以解除部分限制。"
+
+msgid "Nginx parameters"
+msgstr "Nginx参数"
+
+msgid "uWSGI parameters"
+msgstr "uWSGI参数"
+
+msgid "If large file uploads fail, increase the timeout values."
+msgstr "如果出现大文件上传失败，请调高超时时间。"
+
+msgid "Script timeout"
+msgstr "脚本超时时间"
+
+msgid "Network timeout"
+msgstr "网络超时时间"
+
+msgid "Seconds"
+msgstr "秒"
+
+msgid "Unlimited"
+msgstr "不限制"
+
+msgid "File upload buffering"
+msgstr "文件上传缓存"
+
+msgid "When enabled, uploaded files are buffered before being written to disk."
+msgstr "开启后文件先缓存然后写入磁盘。"
+
+msgid "Client request body size"
+msgstr "客户端请求体大小"
+
+msgid "Set client_max_body_size in megabytes. Enter 0 for unlimited."
+msgstr "设置client_max_body_size，单位为M。填写0表示不限制。"
+
+msgid "Apply configuration"
+msgstr "应用配置"
+
+msgid "Nginx configuration applied"
+msgstr "Nginx配置已生效"
+
+msgid "Nginx configuration saved"
+msgstr "Nginx配置已保存"
+
+msgid "Install Nginx"
+msgstr "安装Nginx"
+
+msgid "Install Nginx now?"
+msgstr "现在安装Nginx吗？"
+
+msgid "Installing Nginx will replace the current web server. After installation, the web service will restart and you must access the management interface through HTTPS."
+msgstr "安装Nginx后将替换现有Web服务器。安装完成后Web服务会重启，您需要通过HTTPS重新访问管理界面。"
+
+msgid "Installing Nginx"
+msgstr "正在安装Nginx"
+
+msgid "Installing Nginx, please wait."
+msgstr "正在安装Nginx，请稍候。"
+
+msgid "Installing, please wait, %d seconds remaining."
+msgstr "正在安装，请稍后，剩余%d秒。"
+
+msgid "The web interface may be interrupted during installation. After installation, the login page will be reopened. If it cannot be accessed, please try again later."
+msgstr "安装过程Web界面可能会中断，安装完成后会重新访问登录界面，如果无法访问，请过段时间再试。"
+
+msgid "Nginx installation failed"
+msgstr "Nginx安装失败"
+
+msgid "Nginx is not running"
+msgstr "Nginx未运行"
+
+msgid "Web service is not supported"
+msgstr "当前Web服务不支持配置"
+
+msgid "Nginx configuration template was not found"
+msgstr "未找到Nginx配置模板"
+
+msgid "uwsgi_request_buffering directive was not found"
+msgstr "未找到uwsgi_request_buffering配置项"
+
+msgid "%s directive was not found"
+msgstr "未找到 %s 配置项"
+
+msgid "Failed to update Nginx configuration"
+msgstr "更新Nginx配置失败"
+
+msgid "Failed to backup Nginx configuration"
+msgstr "备份Nginx配置失败"
+
+msgid "Nginx configuration test failed"
+msgstr "Nginx配置测试失败"
+
+msgid "Failed to reload Nginx"
+msgstr "重新加载Nginx失败"
+
+msgid "Failed to update uHTTPd configuration"
+msgstr "更新uHTTPd配置失败"
+
+msgid "Failed to restart uHTTPd"
+msgstr "重启uHTTPd失败"
+
+msgid "Failed to restart Nginx"
+msgstr "重启Nginx失败"
+
+msgid "uWSGI configuration file was not found"
+msgstr "未找到uWSGI配置文件"
+
+msgid "Failed to update uWSGI configuration"
+msgstr "更新uWSGI配置失败"
+
+msgid "Failed to backup uWSGI configuration"
+msgstr "备份uWSGI配置失败"
+
+msgid "Failed to restart uWSGI"
+msgstr "重启uWSGI失败"
+
+msgid "Compress"
+msgstr "压缩"
+
+msgid "Extract"
+msgstr "解压"
+
+msgid "Archive format"
+msgstr "压缩格式"
+
+msgid "Archive name"
+msgstr "压缩包名称"
+
+msgid "Archive operation"
+msgstr "压缩任务"
+
+msgid "Creating archive"
+msgstr "正在压缩"
+
+msgid "Extracting archive"
+msgstr "正在解压"
+
+msgid "Archive created successfully"
+msgstr "压缩完成"
+
+msgid "Archive extracted successfully"
+msgstr "解压完成"
+
+msgid "Archive operation failed"
+msgstr "压缩操作失败"
+
+msgid "Another archive task is already running"
+msgstr "已有压缩或解压任务正在运行"
+
+msgid "Archive task not found"
+msgstr "未找到压缩任务"
+
+msgid "Archive command not found"
+msgstr "未找到压缩命令"
+
+msgid "Missing %s tool, please install it from Software Center first"
+msgstr "缺失%s工具，请先在软件中心安装"
+
+msgid "Unsupported archive format"
+msgstr "不支持的压缩格式"
+
+msgid "Archive sources must be in the same directory"
+msgstr "压缩源必须位于同一目录"
+
+msgid "This archive format only supports one regular file"
+msgstr "该压缩格式只支持单个普通文件"
+
+msgid "Preparing archive"
+msgstr "正在准备压缩任务"
+
+msgid "Archive task ended unexpectedly"
+msgstr "压缩任务异常结束"
+
+msgid "Create destination directory failed"
+msgstr "创建目标目录失败"
+
+msgid "Format"
+msgstr "格式"
+
+msgid "Install terminal plugin"
+msgstr "安装终端插件"
+
+msgid "ttyd is already installed"
+msgstr "ttyd 已安装"
